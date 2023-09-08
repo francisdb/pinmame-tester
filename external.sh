@@ -11,7 +11,11 @@ rm -rf pinmame
 git clone --depth 1 https://github.com/vpinball/pinmame.git
 cd pinmame
 if [[ $OSTYPE == 'darwin'* ]]; then
-  cp cmake/libpinmame/CMakeLists_osx-arm64.txt CMakeLists.txt
+  if [[ $(uname -m) == 'arm64' ]]; then
+    cp cmake/libpinmame/CMakeLists_osx-arm64.txt CMakeLists.txt
+  else
+    cp cmake/libpinmame/CMakeLists_osx-x64.txt CMakeLists.txt
+  fi
 elif [[ $OSTYPE == 'linux-gnu'* ]]; then
   cp cmake/libpinmame/CMakeLists_linux-x64.txt CMakeLists.txt
 fi
