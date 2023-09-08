@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 rm -rf pinmame
-git clone git@github.com:vpinball/pinmame.git
+git clone https://github.com/vpinball/pinmame.git
 cd pinmame
 if [[ $OSTYPE == 'darwin'* ]]; then
   cp cmake/libpinmame/CMakeLists_osx-arm64.txt CMakeLists.txt
