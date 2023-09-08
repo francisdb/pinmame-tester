@@ -1,9 +1,14 @@
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 fn main() {
     // Tell cargo to look for shared libraries in the specified directory
-    println!("cargo:rustc-link-search=./pinmame/build/Release");
+    let dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    let pinmame_dir = Path::new(&dir)
+        .join("pinmame")
+        .join("build")
+        .join("Release");
+    println!("cargo:rustc-link-search=native={}", pinmame_dir.display());
 
     // Tell cargo to tell rustc to link the system bzip2
     // shared library.
