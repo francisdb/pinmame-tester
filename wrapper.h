@@ -1,0 +1,1 @@
+#include "../pinmame/src/libpinmame/libpinmame.h"

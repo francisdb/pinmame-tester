@@ -1,0 +1,212 @@
+use std::ffi::{c_void, CStr, CString};
+
+use crate::libpinmame::{
+    PinmameConfig, PinmameGame, PinmameGetChangedLamps, PinmameGetChangedSolenoids, PinmameGetGame,
+    PinmameGetGames, PinmameGetMaxLamps, PinmameGetMaxSolenoids, PinmameIsRunning,
+    PinmameLampState, PinmameRun, PinmameSetConfig, PinmameSetDmdMode, PinmameSetHandleKeyboard,
+    PinmameSetHandleMechanics, PinmameSetUserData, PinmameSolenoidState, PinmameStop,
+    PINMAME_DMD_MODE, PINMAME_DMD_MODE_BRIGHTNESS, PINMAME_DMD_MODE_RAW, PINMAME_STATUS,
+    PINMAME_STATUS_CONFIG_NOT_SET, PINMAME_STATUS_EMULATOR_NOT_RUNNING,
+    PINMAME_STATUS_GAME_ALREADY_RUNNING, PINMAME_STATUS_GAME_NOT_FOUND,
+    PINMAME_STATUS_MECH_HANDLE_MECHANICS, PINMAME_STATUS_MECH_NO_INVALID, PINMAME_STATUS_OK,
+};
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum PinmameStatus {
+    Ok,
+    ConfigNotSet,
+    GameNotFound,
+    GameAlreadyRunning,
+    EmulatorNotRunning,
+    MechHandleMechanics,
+    MechNoInvalid,
+}
+
+impl From<PINMAME_STATUS> for PinmameStatus {
+    fn from(status: u32) -> Self {
+        match status {
+            PINMAME_STATUS_OK => PinmameStatus::Ok,
+            PINMAME_STATUS_CONFIG_NOT_SET => PinmameStatus::ConfigNotSet,
+            PINMAME_STATUS_GAME_NOT_FOUND => PinmameStatus::GameNotFound,
+            PINMAME_STATUS_GAME_ALREADY_RUNNING => PinmameStatus::GameAlreadyRunning,
+            PINMAME_STATUS_EMULATOR_NOT_RUNNING => PinmameStatus::EmulatorNotRunning,
+            PINMAME_STATUS_MECH_HANDLE_MECHANICS => PinmameStatus::MechHandleMechanics,
+            PINMAME_STATUS_MECH_NO_INVALID => PinmameStatus::MechNoInvalid,
+            _ => unreachable!("Unknown status code"),
+        }
+    }
+}
+
+pub struct Game {
+    pub name: String,
+    pub clone_of: String,
+    pub description: String,
+    pub year: String,
+    pub manufacturer: String,
+    pub flags: u32,
+    pub found: i32,
+}
+impl From<PinmameGame> for Game {
+    fn from(game: PinmameGame) -> Self {
+        Game {
+            name: unsafe { CStr::from_ptr(game.name).to_str().unwrap().to_string() },
+            clone_of: unsafe { CStr::from_ptr(game.clone_of).to_str().unwrap().to_string() },
+            description: unsafe {
+                CStr::from_ptr(game.description)
+                    .to_str()
+                    .unwrap()
+                    .to_string()
+            },
+            year: unsafe { CStr::from_ptr(game.year).to_str().unwrap().to_string() },
+            manufacturer: unsafe {
+                CStr::from_ptr(game.manufacturer)
+                    .to_str()
+                    .unwrap()
+                    .to_string()
+            },
+            flags: game.flags,
+            found: game.found,
+        }
+    }
+}
+
+pub enum DmdMode {
+    Brightness,
+    Raw,
+}
+
+impl From<DmdMode> for PINMAME_DMD_MODE {
+    fn from(dmd_mode: DmdMode) -> Self {
+        match dmd_mode {
+            DmdMode::Brightness => PINMAME_DMD_MODE_BRIGHTNESS,
+            DmdMode::Raw => PINMAME_DMD_MODE_RAW,
+        }
+    }
+}
+
+pub fn set_config(config: &PinmameConfig) {
+    unsafe { PinmameSetConfig(config) }
+}
+
+pub fn set_user_data(user_data: *const std::ffi::c_void) {
+    unsafe { PinmameSetUserData(user_data) }
+}
+
+pub fn set_handle_keyboard(handle: bool) {
+    unsafe { PinmameSetHandleKeyboard(handle as i32) }
+}
+
+pub fn set_handle_mechanics(handle: bool) {
+    unsafe { PinmameSetHandleMechanics(handle as i32) }
+}
+
+pub fn set_dmd_mode(dmd_mode: DmdMode) {
+    unsafe { PinmameSetDmdMode(dmd_mode.into()) }
+}
+
+pub fn is_running() -> bool {
+    unsafe { PinmameIsRunning() > 0 }
+}
+
+pub fn stop() {
+    unsafe { PinmameStop() };
+}
+
+pub fn get_games() -> Result<Vec<Game>, PinmameStatus> {
+    let games_user_data = GamesUserData { games: vec![] };
+    let status = unsafe {
+        PinmameGetGames(
+            Some(games_callback),
+            &games_user_data as *const _ as *mut c_void,
+        )
+    }
+    .into();
+    if status != PinmameStatus::Ok {
+        return Err(status);
+    }
+    Ok(games_user_data.games)
+}
+
+pub fn get_game(p_name: &str) -> Result<Game, PinmameStatus> {
+    let p_name = CString::new(p_name).unwrap();
+    let game_user_data = GameUserData { game: None };
+    let status: PinmameStatus = unsafe {
+        PinmameGetGame(
+            p_name.as_ptr(),
+            Some(game_callback),
+            &game_user_data as *const _ as *mut c_void,
+        )
+    }
+    .into();
+    if status != PinmameStatus::Ok {
+        return Err(status);
+    }
+    Ok(game_user_data.game.unwrap())
+}
+
+pub fn run(p_name: &str) -> PinmameStatus {
+    let p_name = CString::new(p_name).unwrap();
+    unsafe { PinmameRun(p_name.as_ptr()) }.into()
+}
+
+pub fn get_max_lamps() -> i32 {
+    unsafe { PinmameGetMaxLamps() }
+}
+
+pub fn get_max_solenoids() -> i32 {
+    unsafe { PinmameGetMaxSolenoids() }
+}
+
+pub fn get_changed_lamps() -> Vec<PinmameLampState> {
+    let max_lamps = get_max_lamps();
+    // TODO could be more efficient to keep this vector around between invocations
+    let lamps_changed: Vec<PinmameLampState> = vec![
+        PinmameLampState {
+            lampNo: 0,
+            state: 0
+        };
+        max_lamps as usize
+    ];
+    let lamps_state: *mut PinmameLampState = lamps_changed.as_ptr() as *mut PinmameLampState;
+    let num = unsafe { PinmameGetChangedLamps(lamps_state) };
+
+    let states = unsafe { std::slice::from_raw_parts(lamps_state, num.try_into().unwrap()) };
+    states.to_vec()
+}
+
+pub fn get_changed_solenoids() -> Vec<PinmameSolenoidState> {
+    let max_solenoids = get_max_solenoids();
+    // TODO could be more efficient to keep this vector around between invocations
+    let solenoids_changed: Vec<PinmameSolenoidState> =
+        vec![PinmameSolenoidState { solNo: 0, state: 0 }; max_solenoids as usize];
+    let solenoids_state: *mut PinmameSolenoidState =
+        solenoids_changed.as_ptr() as *mut PinmameSolenoidState;
+    let num = unsafe { PinmameGetChangedSolenoids(solenoids_state) };
+
+    let states = unsafe { std::slice::from_raw_parts(solenoids_state, num.try_into().unwrap()) };
+    states.to_vec()
+}
+
+struct GameUserData {
+    game: Option<Game>,
+}
+
+extern "C" fn game_callback(game: *mut PinmameGame, mut _p_user_data: *const c_void) {
+    unsafe {
+        let game = &mut *game;
+        let p_user_data = &mut *(_p_user_data as *mut GameUserData);
+        p_user_data.game = Some((*game).into());
+    }
+}
+
+struct GamesUserData {
+    games: Vec<Game>,
+}
+
+extern "C" fn games_callback(game: *mut PinmameGame, mut _p_user_data: *const c_void) {
+    unsafe {
+        let game = &mut *game;
+        let p_user_data = &mut *(_p_user_data as *mut GamesUserData);
+        p_user_data.games.push((*game).into());
+    }
+}
