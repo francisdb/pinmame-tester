@@ -1,1 +1,1 @@
-#include "../pinmame/src/libpinmame/libpinmame.h"
+#include "./pinmame/src/libpinmame/libpinmame.h"
