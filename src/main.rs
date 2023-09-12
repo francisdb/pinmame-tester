@@ -14,15 +14,22 @@ use sdl2::{
 
 use dmd::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use libpinmame::{
-    va_list, PinmameAudioInfo, PinmameConfig, PinmameDisplayLayout, PinmameMechInfo,
+    PinmameAudioInfo, PinmameConfig, PinmameDisplayLayout, PinmameMechInfo,
     PINMAME_AUDIO_FORMAT_AUDIO_FORMAT_INT16, PINMAME_KEYCODE_ESCAPE, PINMAME_KEYCODE_MENU,
     PINMAME_KEYCODE_Q,
 };
 use pinmame::{Game, PinmameStatus};
 
-use crate::pinmame::DmdMode;
+use crate::{
+    keyboard::map_keycode,
+    pinmame::{
+        pinmame_on_console_data_updated_callback, pinmame_on_log_message_callback,
+        pinmame_on_mech_updated_callback, pinmame_on_solenoid_updated_callback, DmdMode,
+    },
+};
 
 mod dmd;
+mod keyboard;
 #[allow(
     dead_code,
     non_camel_case_types,
@@ -36,6 +43,7 @@ extern "C" fn pinmame_on_state_updated_callback(state: i32, _p_user_data: *const
     info!("OnStateUpdated(): state={}", state);
 
     if state == 0 {
+        warn!("OnStateUpdated(): state=0, exiting");
         std::process::exit(1);
     } else {
         // We had to come up with our own defaults
@@ -71,72 +79,23 @@ extern "C" fn pinmame_on_display_available_callback(
     display_layout: *mut libpinmame::PinmameDisplayLayout,
     _p_user_data: *const c_void,
 ) {
-    unsafe {
-        info!(
+    let layout = unsafe { *display_layout };
+
+    info!(
             "OnDisplayAvailable(): index={}, displayCount={}, type={}, top={}, left={}, width={}, height={}, depth={}, length={}",
             index,
             display_count,
-            (*display_layout).type_,
-            (*display_layout).top,
-            (*display_layout).left,
-            (*display_layout).width,
-            (*display_layout).height,
-            (*display_layout).depth,
-            (*display_layout).length
+            layout.type_,
+            layout.top,
+            layout.left,
+            layout.width,
+            layout.height,
+            layout.depth,
+            layout.length
         );
-        // set the display layout
-        let tester: &mut Tester = &mut *(_p_user_data as *mut Tester);
-        tester.display_layout = Some(*display_layout);
-    }
-}
-
-extern "C" fn pinmame_on_mech_available_callback(
-    mech_no: ::std::os::raw::c_int,
-    mech_info: *mut PinmameMechInfo,
-    _user_data: *const ::std::os::raw::c_void,
-) {
-    unsafe {
-        info!(
-            "OnMechAvailable(): mechNo={}, type={}, length={}, steps={}, pos={}, speed={}",
-            mech_no,
-            (*mech_info).type_,
-            (*mech_info).length,
-            (*mech_info).steps,
-            (*mech_info).pos,
-            (*mech_info).speed
-        );
-    }
-}
-
-unsafe extern "C" fn pinmame_on_log_message_callback(
-    log_level: u32,
-    format: *const ::std::os::raw::c_char,
-    args: va_list,
-    _user_data: *const ::std::os::raw::c_void,
-) {
-    unsafe {
-        let str = vsprintf::vsprintf(format, args).unwrap();
-        match log_level {
-            libpinmame::PINMAME_LOG_LEVEL_LOG_DEBUG => {
-                debug!(target: "pinmame", "{}", str);
-            }
-            libpinmame::PINMAME_LOG_LEVEL_LOG_INFO => {
-                info!(target: "pinmame", "{}", str);
-            }
-            libpinmame::PINMAME_LOG_LEVEL_LOG_ERROR => {
-                error!(target: "pinmame", "{}", str);
-            }
-            _ => warn!("Unknown log level: {}", log_level),
-        }
-    }
-}
-
-unsafe extern "C" fn pinmame_on_console_data_updated_callback(
-    _data: *mut ::std::os::raw::c_void,
-    size: i32,
-    _user_data: *const ::std::os::raw::c_void,
-) {
-    info!("OnConsoleDataUpdated: size={}", size);
+    // set the display layout
+    let tester: &mut Tester = unsafe { &mut *(_p_user_data as *mut Tester) };
+    tester.display_layout = Some(layout);
 }
 
 unsafe extern "C" fn pinmame_on_display_updated_callback(
@@ -161,8 +120,6 @@ unsafe extern "C" fn pinmame_on_display_updated_callback(
         if ((*display_layout).type_ & libpinmame::PINMAME_DISPLAY_TYPE_DMD)
             == libpinmame::PINMAME_DISPLAY_TYPE_DMD
         {
-            debug!("DMD");
-            //dump_dmd(index, _display_data as *mut u8, display_layout);
             let tester: &mut Tester = unsafe { &mut *(_user_data as *mut Tester) };
             match tester.display_data.send(
                 std::slice::from_raw_parts_mut(
@@ -187,20 +144,44 @@ unsafe extern "C" fn pinmame_on_audio_available_callback(
     audio_info: *mut libpinmame::PinmameAudioInfo,
     _user_data: *const ::std::os::raw::c_void,
 ) -> i32 {
+    let audio_info = audio_info.as_ref().unwrap();
+    let format = match audio_info.format {
+        libpinmame::PINMAME_AUDIO_FORMAT_AUDIO_FORMAT_INT16 => "int16",
+        libpinmame::PINMAME_AUDIO_FORMAT_AUDIO_FORMAT_FLOAT => "float",
+        other => unreachable!("Unknown audio format: {}", other),
+    };
     info!(
         "OnAudioAvailable(): format={}, channels={}, sampleRate={}, framesPerSecond={}, samplesPerFrame={}, bufferSize={}",
-        (*audio_info).format,
-        (*audio_info).channels,
-        (*audio_info).sampleRate,
-        (*audio_info).framesPerSecond,
-        (*audio_info).samplesPerFrame,
-        (*audio_info).bufferSize
+        format,
+        audio_info.channels,
+        audio_info.sampleRate,
+        audio_info.framesPerSecond,
+        audio_info.samplesPerFrame,
+        audio_info.bufferSize
     );
 
     let tester: &mut Tester = unsafe { &mut *(_user_data as *mut Tester) };
     tester.audio_info = Some(*audio_info);
 
     (*audio_info).samplesPerFrame
+}
+
+//TODO make private
+pub extern "C" fn pinmame_on_mech_available_callback(
+    mech_no: ::std::os::raw::c_int,
+    mech_info: *mut PinmameMechInfo,
+    _user_data: *const ::std::os::raw::c_void,
+) {
+    // TODO not sure we need to clone here
+    // TODO do we need to free this memory?
+    let mech_info = unsafe { *mech_info };
+
+    info!(
+        "OnMechAvailable(): mechNo={}, type={}, length={}, steps={}, pos={}, speed={}",
+        mech_no, mech_info.type_, mech_info.length, mech_info.steps, mech_info.pos, mech_info.speed
+    );
+    let tester: &mut Tester = unsafe { &mut *(_user_data as *mut Tester) };
+    tester.mech_info.push(mech_info);
 }
 
 extern "C" fn pinmame_on_audio_updated_callback(
@@ -225,35 +206,6 @@ extern "C" fn pinmame_on_audio_updated_callback(
     samples
 }
 
-extern "C" fn pinmame_on_solenoid_updated_callback(
-    solenoid_state: *mut libpinmame::PinmameSolenoidState,
-    _user_data: *const ::std::os::raw::c_void,
-) {
-    unsafe {
-        info!(
-            "OnSolenoidUpdated: solenoid={}, state={}",
-            (*solenoid_state).solNo,
-            (*solenoid_state).state
-        );
-    }
-}
-
-unsafe extern "C" fn pinmame_on_mech_updated_callback(
-    mech_no: i32,
-    mech_info: *mut PinmameMechInfo,
-    _user_data: *const ::std::os::raw::c_void,
-) {
-    info!(
-        "OnMechUpdated: mechNo={}, type={}, length={}, steps={}, pos={}, speed={}",
-        mech_no,
-        (*mech_info).type_,
-        (*mech_info).length,
-        (*mech_info).steps,
-        (*mech_info).pos,
-        (*mech_info).speed
-    );
-}
-
 extern "C" fn pinmame_is_key_pressed_callback(
     _keycode: libpinmame::PINMAME_KEYCODE,
     _user_data: *const ::std::os::raw::c_void,
@@ -275,6 +227,7 @@ struct Tester {
     display_layout: Option<PinmameDisplayLayout>,
     display_data: mpsc::Sender<Vec<u8>>,
     keyboard_state: [bool; (PINMAME_KEYCODE_MENU + 1) as usize],
+    mech_info: Vec<PinmameMechInfo>,
 }
 
 fn main() -> Result<(), String> {
@@ -309,6 +262,7 @@ fn main() -> Result<(), String> {
         display_layout: None,
         display_data: dmd_tx,
         keyboard_state: [false; (PINMAME_KEYCODE_MENU + 1) as usize],
+        mech_info: Vec::new(),
     };
 
     // get home directory
@@ -338,21 +292,27 @@ fn main() -> Result<(), String> {
         cb_OnLogMessage: Some(pinmame_on_log_message_callback),
     };
 
-    //PinmameRun("mm_109c");
-    //PinmameRun("fh_906h");
-    //PinmameRun("hh7");
-    //PinmameRun("rescu911");
-    //PinmameRun("tf_180h");
+    //PinmameRun("mm_109c"); // Medieval Madness
+    //PinmameRun("fh_906h"); // FunHouse
+    //PinmameRun("hh7"); // Haunted House, 7 displays
+    //PinmameRun("rescu911"); // Rescue 911 (Switch short return 5 error)
+    //PinmameRun("tf_180h"); // Transformers
     //PinmameRun("flashgdn");
-    //PinmameRun("fourx4");
+    //PinmameRun("fourx4"); // 4x4, 2 displays?
     //PinmameRun("ripleys");
-    //PinmameRun("fh_l9");
-    //PinmameRun("acd_170hc");
+    //PinmameRun("fh_l9"); // FunHouse
+    //PinmameRun("acd_170hc"); // ACDC
     //PinmameRun("snspares");
+    // xfiles - sound is messed up, indicates 2 channels
+    // hook_501 - sound is messed up, indicates 2 channels
+    // barbwire - sound is messed up, indicates 2 channels
+    // cv_20h - cirqus voltaire
 
-    let terminator_2_game_name = "t2_l8";
-    // let medieval_madness_game_name = "mm_109c";
-    // let fourx4_game_name = "fourx4";
+    //let terminator_2_game_name = "t2_l8";
+    //let medieval_madness_game_name = "mm_109c";
+    //let fourx4_game_name = "fourx4";
+
+    let p_name = "cv_20h";
 
     pinmame::set_config(&config);
 
@@ -367,15 +327,13 @@ fn main() -> Result<(), String> {
             let mut games = games;
             games.sort_by(|a, b| a.name.cmp(&b.name));
             for game in games {
-                info!("  {}", describe_game(game));
+                //info!("  {}", describe_game(game));
             }
         }
         Err(status) => {
             error!("get_games() failed: {:?}", status);
         }
     }
-
-    let p_name = terminator_2_game_name;
 
     match pinmame::get_game(p_name) {
         Ok(game) => {
@@ -397,6 +355,15 @@ fn main() -> Result<(), String> {
     let max_solenoids = pinmame::get_max_solenoids();
     info!("max_solenoids: {}", max_solenoids);
 
+    // Close the coin door for Medieval Madness
+    //pinmame::set_switch(22, 1);
+
+    // Rescu911 Switch short return 5
+    // set all switches to 1
+    // for i in 0..63 {
+    //     pinmame::set_switch(i, 1);
+    // }
+
     'main: loop {
         // get the inputs here
         for event in events.poll_iter() {
@@ -407,8 +374,11 @@ fn main() -> Result<(), String> {
                     keycode: Some(keycode),
                     ..
                 } => {
-                    if let Some(keycode) = map_keycode(keycode) {
-                        tester.keyboard_state[keycode as usize] = true;
+                    match map_keycode(keycode) {
+                        Some(keycode) => {
+                            tester.keyboard_state[keycode as usize] = true;
+                        }
+                        None => warn!("KeyDown keycode not mapped: {:?}", keycode),
                     }
                     match keycode {
                         Keycode::Escape => {
@@ -419,16 +389,22 @@ fn main() -> Result<(), String> {
                             tester.keyboard_state[PINMAME_KEYCODE_Q as usize] = true;
                             break 'main;
                         }
+                        Keycode::S => {
+                            cirqus_switch_init();
+                        }
                         _ => {}
                     }
                     //println!("key down: {:?}", keycode);
                 }
-                Event::KeyUp { keycode, .. } => {
-                    if let Some(keycode) = map_keycode(keycode.unwrap()) {
-                        tester.keyboard_state[keycode as usize] = false;
-                    }
-                    //println!("key up: {:?}", keycode);
-                }
+                Event::KeyUp { keycode, .. } => match keycode {
+                    Some(keycode) => match map_keycode(keycode) {
+                        Some(keycode) => {
+                            tester.keyboard_state[keycode as usize] = false;
+                        }
+                        None => warn!("KeyUp keycode not mapped: {:?}", keycode),
+                    },
+                    None => (),
+                },
 
                 Event::MouseButtonDown { x, y, .. } => {
                     // canvas.set_draw_color(pixels::Color::RGB(0, 0, 0));
@@ -438,6 +414,8 @@ fn main() -> Result<(), String> {
                     // lastx = x as i16;
                     // lasty = y as i16;
                     println!("mouse btn down at ({},{})", x, y);
+                    let s = pinmame::get_switch(16);
+                    println!("switch 16: {}", s);
                     // canvas.present();
                 }
 
@@ -462,7 +440,7 @@ fn main() -> Result<(), String> {
 
         let changed_lamps = pinmame::get_changed_lamps();
         if !changed_lamps.is_empty() {
-            info!("Update for {} lamps", changed_lamps.len());
+            //info!("Update for {} lamps", changed_lamps.len());
             for lamp in changed_lamps {
                 //info!("lamp {}: {}", lamp.lampNo, lamp.state);
             }
@@ -500,85 +478,28 @@ fn main() -> Result<(), String> {
     Ok(())
 }
 
+fn cirqus_switch_init() {
+    println!("cirqus_switch_init");
+    // Close the coin door for Cirqus Voltaire
+    pinmame::set_switch(22, 1);
+
+    // Top eddy switch for Cirqus Voltaire
+    pinmame::set_switch(16, 1);
+
+    // opto switches for Cirqus Voltaire (typically closed)
+    pinmame::set_switch(31, 1); // eject
+    pinmame::set_switch(32, 1); // ball 1
+    pinmame::set_switch(33, 1); // ball 2
+    pinmame::set_switch(34, 1); // ball 3
+    pinmame::set_switch(35, 1); // ball 4
+    pinmame::set_switch(36, 1); // popper
+}
+
 fn describe_game(game: Game) -> String {
     format!(
         "name={}, description={}, manufacturer={}, year={}, flags={}, found={}",
         game.name, game.description, game.manufacturer, game.year, game.flags, game.found
     )
-}
-
-fn map_keycode(keycode: Keycode) -> Option<libpinmame::PINMAME_KEYCODE> {
-    match keycode {
-        Keycode::Num0 => Some(libpinmame::PINMAME_KEYCODE_NUMBER_0),
-        Keycode::Num1 => Some(libpinmame::PINMAME_KEYCODE_NUMBER_1),
-        Keycode::Num2 => Some(libpinmame::PINMAME_KEYCODE_NUMBER_2),
-        Keycode::Num3 => Some(libpinmame::PINMAME_KEYCODE_NUMBER_3),
-        Keycode::Num4 => Some(libpinmame::PINMAME_KEYCODE_NUMBER_4),
-        Keycode::Num5 => Some(libpinmame::PINMAME_KEYCODE_NUMBER_5),
-        Keycode::Num6 => Some(libpinmame::PINMAME_KEYCODE_NUMBER_6),
-        Keycode::Num7 => Some(libpinmame::PINMAME_KEYCODE_NUMBER_7),
-        Keycode::Num8 => Some(libpinmame::PINMAME_KEYCODE_NUMBER_8),
-        Keycode::Num9 => Some(libpinmame::PINMAME_KEYCODE_NUMBER_9),
-        Keycode::A => Some(libpinmame::PINMAME_KEYCODE_A),
-        Keycode::B => Some(libpinmame::PINMAME_KEYCODE_B),
-        Keycode::C => Some(libpinmame::PINMAME_KEYCODE_C),
-        Keycode::D => Some(libpinmame::PINMAME_KEYCODE_D),
-        Keycode::E => Some(libpinmame::PINMAME_KEYCODE_E),
-        Keycode::F => Some(libpinmame::PINMAME_KEYCODE_F),
-        Keycode::G => Some(libpinmame::PINMAME_KEYCODE_G),
-        Keycode::H => Some(libpinmame::PINMAME_KEYCODE_H),
-        Keycode::I => Some(libpinmame::PINMAME_KEYCODE_I),
-        Keycode::J => Some(libpinmame::PINMAME_KEYCODE_J),
-        Keycode::K => Some(libpinmame::PINMAME_KEYCODE_K),
-        Keycode::L => Some(libpinmame::PINMAME_KEYCODE_L),
-        Keycode::M => Some(libpinmame::PINMAME_KEYCODE_M),
-        Keycode::N => Some(libpinmame::PINMAME_KEYCODE_N),
-        Keycode::O => Some(libpinmame::PINMAME_KEYCODE_O),
-        Keycode::P => Some(libpinmame::PINMAME_KEYCODE_P),
-        Keycode::Q => Some(libpinmame::PINMAME_KEYCODE_Q),
-        Keycode::R => Some(libpinmame::PINMAME_KEYCODE_R),
-        Keycode::S => Some(libpinmame::PINMAME_KEYCODE_S),
-        Keycode::T => Some(libpinmame::PINMAME_KEYCODE_T),
-        Keycode::U => Some(libpinmame::PINMAME_KEYCODE_U),
-        Keycode::V => Some(libpinmame::PINMAME_KEYCODE_V),
-        Keycode::W => Some(libpinmame::PINMAME_KEYCODE_W),
-        Keycode::X => Some(libpinmame::PINMAME_KEYCODE_X),
-        Keycode::Y => Some(libpinmame::PINMAME_KEYCODE_Y),
-        Keycode::Z => Some(libpinmame::PINMAME_KEYCODE_Z),
-        Keycode::F1 => Some(libpinmame::PINMAME_KEYCODE_F1),
-        Keycode::F2 => Some(libpinmame::PINMAME_KEYCODE_F2),
-        Keycode::F3 => Some(libpinmame::PINMAME_KEYCODE_F3),
-        Keycode::F4 => Some(libpinmame::PINMAME_KEYCODE_F4),
-        Keycode::F5 => Some(libpinmame::PINMAME_KEYCODE_F5),
-        Keycode::F6 => Some(libpinmame::PINMAME_KEYCODE_F6),
-        Keycode::F7 => Some(libpinmame::PINMAME_KEYCODE_F7),
-        Keycode::F8 => Some(libpinmame::PINMAME_KEYCODE_F8),
-        Keycode::F9 => Some(libpinmame::PINMAME_KEYCODE_F9),
-        Keycode::F10 => Some(libpinmame::PINMAME_KEYCODE_F10),
-        Keycode::F11 => Some(libpinmame::PINMAME_KEYCODE_F11),
-        Keycode::F12 => Some(libpinmame::PINMAME_KEYCODE_F12),
-        Keycode::Kp0 => Some(libpinmame::PINMAME_KEYCODE_KEYPAD_0),
-        Keycode::Kp1 => Some(libpinmame::PINMAME_KEYCODE_KEYPAD_1),
-        Keycode::Kp2 => Some(libpinmame::PINMAME_KEYCODE_KEYPAD_2),
-        Keycode::Kp3 => Some(libpinmame::PINMAME_KEYCODE_KEYPAD_3),
-        Keycode::Kp4 => Some(libpinmame::PINMAME_KEYCODE_KEYPAD_4),
-        Keycode::Kp5 => Some(libpinmame::PINMAME_KEYCODE_KEYPAD_5),
-        Keycode::Kp6 => Some(libpinmame::PINMAME_KEYCODE_KEYPAD_6),
-        Keycode::Kp7 => Some(libpinmame::PINMAME_KEYCODE_KEYPAD_7),
-        Keycode::Kp8 => Some(libpinmame::PINMAME_KEYCODE_KEYPAD_8),
-        Keycode::Kp9 => Some(libpinmame::PINMAME_KEYCODE_KEYPAD_9),
-        Keycode::KpEnter => Some(libpinmame::PINMAME_KEYCODE_KEYPAD_ENTER),
-        Keycode::KpPlus => Some(libpinmame::PINMAME_KEYCODE_KEYPAD_ADD),
-        Keycode::KpMinus => Some(libpinmame::PINMAME_KEYCODE_KEYPAD_SUBTRACT),
-        Keycode::KpMultiply => Some(libpinmame::PINMAME_KEYCODE_KEYPAD_MULTIPLY),
-        Keycode::KpDivide => Some(libpinmame::PINMAME_KEYCODE_KEYPAD_DIVIDE),
-        Keycode::LeftParen => Some(libpinmame::PINMAME_KEYCODE_LEFT_SHIFT),
-        Keycode::RightParen => Some(libpinmame::PINMAME_KEYCODE_RIGHT_SHIFT),
-
-        Keycode::Menu => Some(PINMAME_KEYCODE_MENU),
-        Keycode::Escape => Some(PINMAME_KEYCODE_ESCAPE),
-        _ => None,
-    }
 }
 
 fn setup_sdl2(

@@ -1,12 +1,15 @@
 use std::ffi::{c_void, CStr, CString};
 
+use log::{debug, error, info, warn};
+
 use crate::libpinmame::{
-    PinmameConfig, PinmameGame, PinmameGetChangedLamps, PinmameGetChangedSolenoids, PinmameGetGame,
-    PinmameGetGames, PinmameGetMaxLamps, PinmameGetMaxSolenoids, PinmameIsRunning,
-    PinmameLampState, PinmameRun, PinmameSetConfig, PinmameSetDmdMode, PinmameSetHandleKeyboard,
-    PinmameSetHandleMechanics, PinmameSetUserData, PinmameSolenoidState, PinmameStop,
-    PINMAME_DMD_MODE, PINMAME_DMD_MODE_BRIGHTNESS, PINMAME_DMD_MODE_RAW, PINMAME_STATUS,
-    PINMAME_STATUS_CONFIG_NOT_SET, PINMAME_STATUS_EMULATOR_NOT_RUNNING,
+    va_list, PinmameConfig, PinmameGame, PinmameGetChangedLamps, PinmameGetChangedSolenoids,
+    PinmameGetGame, PinmameGetGames, PinmameGetMaxLamps, PinmameGetMaxSolenoids, PinmameGetSwitch,
+    PinmameIsRunning, PinmameLampState, PinmameMechInfo, PinmameRun, PinmameSetConfig,
+    PinmameSetDmdMode, PinmameSetHandleKeyboard, PinmameSetHandleMechanics, PinmameSetSwitch,
+    PinmameSetSwitches, PinmameSetUserData, PinmameSolenoidState, PinmameStop, PinmameSwitchState,
+    PINMAME_DMD_MODE, PINMAME_DMD_MODE_BRIGHTNESS, PINMAME_DMD_MODE_RAW, PINMAME_LOG_LEVEL,
+    PINMAME_STATUS, PINMAME_STATUS_CONFIG_NOT_SET, PINMAME_STATUS_EMULATOR_NOT_RUNNING,
     PINMAME_STATUS_GAME_ALREADY_RUNNING, PINMAME_STATUS_GAME_NOT_FOUND,
     PINMAME_STATUS_MECH_HANDLE_MECHANICS, PINMAME_STATUS_MECH_NO_INVALID, PINMAME_STATUS_OK,
 };
@@ -157,6 +160,18 @@ pub fn get_max_solenoids() -> i32 {
     unsafe { PinmameGetMaxSolenoids() }
 }
 
+pub fn set_switch(switch_no: i32, state: i32) {
+    unsafe { PinmameSetSwitch(switch_no, state) }
+}
+
+pub fn get_switch(switch_no: i32) -> i32 {
+    unsafe { PinmameGetSwitch(switch_no) }
+}
+
+pub fn set_switches(switches: &[PinmameSwitchState]) {
+    unsafe { PinmameSetSwitches(switches.as_ptr(), switches.len() as i32) };
+}
+
 pub fn get_changed_lamps() -> Vec<PinmameLampState> {
     let max_lamps = get_max_lamps();
     // TODO could be more efficient to keep this vector around between invocations
@@ -170,6 +185,9 @@ pub fn get_changed_lamps() -> Vec<PinmameLampState> {
     let lamps_state: *mut PinmameLampState = lamps_changed.as_ptr() as *mut PinmameLampState;
     let num = unsafe { PinmameGetChangedLamps(lamps_state) };
 
+    if num == -1 {
+        return vec![];
+    }
     let states = unsafe { std::slice::from_raw_parts(lamps_state, num.try_into().unwrap()) };
     states.to_vec()
 }
@@ -183,6 +201,9 @@ pub fn get_changed_solenoids() -> Vec<PinmameSolenoidState> {
         solenoids_changed.as_ptr() as *mut PinmameSolenoidState;
     let num = unsafe { PinmameGetChangedSolenoids(solenoids_state) };
 
+    if num == -1 {
+        return vec![];
+    }
     let states = unsafe { std::slice::from_raw_parts(solenoids_state, num.try_into().unwrap()) };
     states.to_vec()
 }
@@ -208,5 +229,76 @@ extern "C" fn games_callback(game: *mut PinmameGame, mut _p_user_data: *const c_
         let game = &mut *game;
         let p_user_data = &mut *(_p_user_data as *mut GamesUserData);
         p_user_data.games.push((*game).into());
+    }
+}
+
+//TODO make private
+pub extern "C" fn pinmame_on_solenoid_updated_callback(
+    solenoid_state: *mut PinmameSolenoidState,
+    _user_data: *const ::std::os::raw::c_void,
+) {
+    unsafe {
+        info!(
+            "OnSolenoidUpdated: solenoid={}, state={}",
+            (*solenoid_state).solNo,
+            (*solenoid_state).state
+        );
+    }
+}
+
+//TODO make private
+pub unsafe extern "C" fn pinmame_on_mech_updated_callback(
+    mech_no: i32,
+    mech_info: *mut PinmameMechInfo,
+    _user_data: *const ::std::os::raw::c_void,
+) {
+    info!(
+        "OnMechUpdated: mechNo={}, type={}, length={}, steps={}, pos={}, speed={}",
+        mech_no,
+        (*mech_info).type_,
+        (*mech_info).length,
+        (*mech_info).steps,
+        (*mech_info).pos,
+        (*mech_info).speed
+    );
+}
+
+//TODO make private
+pub unsafe extern "C" fn pinmame_on_console_data_updated_callback(
+    _data: *mut ::std::os::raw::c_void,
+    size: i32,
+    _user_data: *const ::std::os::raw::c_void,
+) {
+    info!("OnConsoleDataUpdated: size={}", size);
+}
+
+//TODO make private
+pub unsafe extern "C" fn pinmame_on_log_message_callback(
+    log_level: u32,
+    format: *const ::std::os::raw::c_char,
+    args: va_list,
+    _user_data: *const ::std::os::raw::c_void,
+) {
+    let str = unsafe { vsprintf::vsprintf(format, args).unwrap() };
+    on_log_message(log_level, str);
+}
+
+fn on_log_message(log_level: PINMAME_LOG_LEVEL, str: String) {
+    // if message contains ERROR, log it as error
+    if str.contains("ERROR") {
+        error!(target: "pinmame", "{}", str);
+        return;
+    }
+    match log_level {
+        PINMAME_LOG_LEVEL_LOG_DEBUG => {
+            debug!(target: "pinmame", "{}", str);
+        }
+        PINMAME_LOG_LEVEL_LOG_INFO => {
+            info!(target: "pinmame", "{}", str);
+        }
+        PINMAME_LOG_LEVEL_LOG_ERROR => {
+            error!(target: "pinmame", "{}", str);
+        }
+        _ => warn!("Unknown log level: {}", log_level),
     }
 }

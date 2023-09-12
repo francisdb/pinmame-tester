@@ -17,17 +17,17 @@ pub fn render_dmd(
     display_layout: &PinmameDisplayLayout,
     canvas: &mut sdl2::render::Canvas<sdl2::video::Window>,
 ) -> Result<(), String> {
-    for x in 0..PIXELS_WIDTH {
-        for y in 0..PIXELS_HEIGHT {
+    for x in 0..display_layout.width as u32 {
+        for y in 0..display_layout.height as u32 {
             // color from display_data
-            let index = (y * PIXELS_WIDTH + x) as usize;
+            let index = (y * display_layout.width as u32 + x) as usize;
             let value = display_data[index];
 
             let color = if display_layout.depth == 2 {
                 match value {
                     0 => pixels::Color::RGB(40, 20, 0),
-                    1 => pixels::Color::RGB(180, 120, 0),
-                    2 => pixels::Color::RGB(225, 140, 0),
+                    1 => pixels::Color::RGB(120, 80, 0),
+                    2 => pixels::Color::RGB(215, 130, 0),
                     3 => pixels::Color::RGB(250, 160, 0),
                     _ => unreachable!("depth 2 should only have 0-3"),
                 }
