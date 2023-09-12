@@ -1,18 +1,26 @@
 use std::ffi::{c_char, CString};
 
+use log::warn;
 use sdl2::{pixels, rect::Rect};
 
-use crate::libpinmame::{PinmameDisplayLayout, PINMAME_DISPLAY_TYPE_SEG16S};
+use crate::libpinmame::{PinmameDisplayLayout, PinmameMechInfo, PINMAME_DISPLAY_TYPE_SEG16S};
 
-const PIXEL_SIZE: u32 = 4;
+const PIXEL_SIZE: u32 = 3;
 
-const PIXELS_WIDTH: u32 = 128;
-const PIXELS_HEIGHT: u32 = 32;
+// const PIXELS_WIDTH: u32 = 128;
+// const PIXELS_HEIGHT: u32 = 32;
 
-pub const SCREEN_WIDTH: u32 = PIXELS_WIDTH * (PIXEL_SIZE + 1);
-pub const SCREEN_HEIGHT: u32 = PIXELS_HEIGHT * (PIXEL_SIZE + 1);
+pub fn dmd_width(display_layout: &PinmameDisplayLayout) -> u32 {
+    display_layout.width as u32 * (PIXEL_SIZE + 1)
+}
+
+pub fn dmd_height(display_layout: &PinmameDisplayLayout) -> u32 {
+    display_layout.height as u32 * (PIXEL_SIZE + 1)
+}
 
 pub fn render_dmd(
+    at_x: u32,
+    at_y: u32,
     display_data: &[u8],
     display_layout: &PinmameDisplayLayout,
     canvas: &mut sdl2::render::Canvas<sdl2::video::Window>,
@@ -43,8 +51,8 @@ pub fn render_dmd(
 
             canvas.set_draw_color(color);
             canvas.fill_rect(Rect::new(
-                (x * (PIXEL_SIZE + 1)) as i32,
-                (y * (PIXEL_SIZE + 1)) as i32,
+                (at_x + x * (PIXEL_SIZE + 1)) as i32,
+                (at_y + y * (PIXEL_SIZE + 1)) as i32,
                 PIXEL_SIZE,
                 PIXEL_SIZE,
             ))?;
@@ -185,7 +193,102 @@ pub(crate) fn dump_alphanumeric(
                 // output[row] = s.into_bytes_with_nul();
             }
 
-            unimplemented!("alphanumeric dmd dump not implemented yet")
+            warn!("TODO: dump alphanumeric not implemented yet");
+            //unimplemented!("alphanumeric dmd dump not implemented yet")
         }
     }
+}
+
+const MECH_BAR_MULTIPLIER: u32 = 2;
+pub fn render_mechs(
+    at_x: u32,
+    at_y: u32,
+    mech_info: &[PinmameMechInfo],
+    canvas: &mut sdl2::render::Canvas<sdl2::video::Window>,
+) -> Result<(), String> {
+    let mech_bar_height = 10;
+    for (pos, mech) in mech_info.iter().enumerate() {
+        let color = pixels::Color::RGB(150, 250, 150);
+        let fill_color = pixels::Color::RGB(50, 150, 50);
+        canvas.set_draw_color(fill_color);
+        canvas.fill_rect(Rect::new(
+            at_x as i32,
+            at_y as i32 + pos as i32 * mech_bar_height as i32,
+            mech.pos as u32 * MECH_BAR_MULTIPLIER,
+            mech_bar_height,
+        ))?;
+        canvas.set_draw_color(color);
+        canvas.draw_rect(Rect::new(
+            at_x as i32,
+            at_y as i32 + pos as i32 * mech_bar_height as i32,
+            mech.length as u32 * MECH_BAR_MULTIPLIER,
+            mech_bar_height,
+        ))?;
+    }
+    Ok(())
+}
+
+pub fn render_lights(
+    at_x: u32,
+    at_y: u32,
+    lamps: &[bool],
+    canvas: &mut sdl2::render::Canvas<sdl2::video::Window>,
+    lamp_size: u32,
+) -> Result<(), String> {
+    // lights are numberedred from 1
+    let mut lamp_index = 1;
+    for x in 0..20 {
+        for y in 0..10 {
+            if lamp_index >= lamps.len() {
+                break;
+            }
+            let color = if lamps[lamp_index] {
+                pixels::Color::RGB(255, 255, 100)
+            } else {
+                pixels::Color::RGB(20, 20, 10)
+            };
+            canvas.set_draw_color(color);
+            canvas.fill_rect(Rect::new(
+                (at_x + x * (lamp_size + 1)) as i32,
+                (at_y + y * (lamp_size + 1)) as i32,
+                lamp_size,
+                lamp_size,
+            ))?;
+            lamp_index += 1;
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn render_solenoids(
+    at_x: u32,
+    at_y: u32,
+    solenoids: &[bool],
+    canvas: &mut sdl2::render::Canvas<sdl2::video::Window>,
+    solenoid_size: u32,
+) -> Result<(), String> {
+    // solenoids are numberedred from 1
+    let mut solenoid_index = 1;
+    for x in 0..20 {
+        for y in 0..10 {
+            if solenoid_index >= solenoids.len() {
+                break;
+            }
+
+            let color = if solenoids[solenoid_index] {
+                pixels::Color::RGB(255, 255, 100)
+            } else {
+                pixels::Color::RGB(20, 20, 10)
+            };
+            canvas.set_draw_color(color);
+            canvas.fill_rect(Rect::new(
+                (at_x + x * (solenoid_size + 1)) as i32,
+                (at_y + y * (solenoid_size + 1)) as i32,
+                solenoid_size,
+                solenoid_size,
+            ))?;
+            solenoid_index += 1;
+        }
+    }
+    Ok(())
 }

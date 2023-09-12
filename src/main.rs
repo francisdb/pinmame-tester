@@ -3,7 +3,7 @@ use std::{
     sync::mpsc,
 };
 
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -12,7 +12,6 @@ use sdl2::{
     pixels,
 };
 
-use dmd::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use libpinmame::{
     PinmameAudioInfo, PinmameConfig, PinmameDisplayLayout, PinmameMechInfo,
     PINMAME_AUDIO_FORMAT_AUDIO_FORMAT_INT16, PINMAME_KEYCODE_ESCAPE, PINMAME_KEYCODE_MENU,
@@ -24,7 +23,7 @@ use crate::{
     keyboard::map_keycode,
     pinmame::{
         pinmame_on_console_data_updated_callback, pinmame_on_log_message_callback,
-        pinmame_on_mech_updated_callback, pinmame_on_solenoid_updated_callback, DmdMode,
+        pinmame_on_solenoid_updated_callback, DmdMode,
     },
 };
 
@@ -163,25 +162,56 @@ unsafe extern "C" fn pinmame_on_audio_available_callback(
     let tester: &mut Tester = unsafe { &mut *(_user_data as *mut Tester) };
     tester.audio_info = Some(*audio_info);
 
-    (*audio_info).samplesPerFrame
+    audio_info.samplesPerFrame
 }
 
 //TODO make private
-pub extern "C" fn pinmame_on_mech_available_callback(
+unsafe extern "C" fn pinmame_on_mech_available_callback(
     mech_no: ::std::os::raw::c_int,
-    mech_info: *mut PinmameMechInfo,
+    mech_info: *mut libpinmame::PinmameMechInfo,
     _user_data: *const ::std::os::raw::c_void,
 ) {
     // TODO not sure we need to clone here
     // TODO do we need to free this memory?
-    let mech_info = unsafe { *mech_info };
+    let mech_info = mech_info.as_ref().unwrap();
+    let safe_mech_info = PinmameMechInfo {
+        type_: mech_info.type_,
+        length: mech_info.length,
+        steps: mech_info.steps,
+        pos: mech_info.pos,
+        speed: mech_info.speed,
+    };
 
     info!(
         "OnMechAvailable(): mechNo={}, type={}, length={}, steps={}, pos={}, speed={}",
-        mech_no, mech_info.type_, mech_info.length, mech_info.steps, mech_info.pos, mech_info.speed
+        mech_no,
+        safe_mech_info.type_,
+        safe_mech_info.length,
+        safe_mech_info.steps,
+        safe_mech_info.pos,
+        safe_mech_info.speed
     );
     let tester: &mut Tester = unsafe { &mut *(_user_data as *mut Tester) };
-    tester.mech_info.push(mech_info);
+    tester.mech_info.push(safe_mech_info);
+}
+
+//TODO make private
+pub unsafe extern "C" fn pinmame_on_mech_updated_callback(
+    mech_no: i32,
+    mech_info: *mut PinmameMechInfo,
+    _user_data: *const ::std::os::raw::c_void,
+) {
+    trace!(
+        "OnMechUpdated: mechNo={}, type={}, length={}, steps={}, pos={}, speed={}",
+        mech_no,
+        (*mech_info).type_,
+        (*mech_info).length,
+        (*mech_info).steps,
+        (*mech_info).pos,
+        (*mech_info).speed
+    );
+    let tester: &mut Tester = unsafe { &mut *(_user_data as *mut Tester) };
+    tester.mech_info[mech_no as usize] = *mech_info;
 }
 
 extern "C" fn pinmame_on_audio_updated_callback(
@@ -228,7 +258,12 @@ struct Tester {
     display_data: mpsc::Sender<Vec<u8>>,
     keyboard_state: [bool; (PINMAME_KEYCODE_MENU + 1) as usize],
     mech_info: Vec<PinmameMechInfo>,
+    lamps: Vec<bool>,
+    solenoids: Vec<bool>,
 }
+
+const SCREEN_WIDTH: u32 = 800; // PIXELS_WIDTH * (PIXEL_SIZE + 1);
+const SCREEN_HEIGHT: u32 = 600; // PIXELS_HEIGHT * (PIXEL_SIZE + 1);
 
 fn main() -> Result<(), String> {
     // run me like this: RUST_LOG=info cargo run
@@ -263,6 +298,8 @@ fn main() -> Result<(), String> {
         display_data: dmd_tx,
         keyboard_state: [false; (PINMAME_KEYCODE_MENU + 1) as usize],
         mech_info: Vec::new(),
+        lamps: Vec::new(),
+        solenoids: Vec::new(),
     };
 
     // get home directory
@@ -307,12 +344,13 @@ fn main() -> Result<(), String> {
     // hook_501 - sound is messed up, indicates 2 channels
     // barbwire - sound is messed up, indicates 2 channels
     // cv_20h - cirqus voltaire
+    // totan_14 - Tales of the Arabian Nights
 
     //let terminator_2_game_name = "t2_l8";
     //let medieval_madness_game_name = "mm_109c";
     //let fourx4_game_name = "fourx4";
 
-    let p_name = "cv_20h";
+    let p_name = "t2_l8";
 
     pinmame::set_config(&config);
 
@@ -352,8 +390,11 @@ fn main() -> Result<(), String> {
 
     let max_lamps = pinmame::get_max_lamps();
     info!("max_lamps: {}", max_lamps);
+    tester.lamps = vec![false; max_lamps as usize];
+
     let max_solenoids = pinmame::get_max_solenoids();
     info!("max_solenoids: {}", max_solenoids);
+    tester.solenoids = vec![false; max_solenoids as usize];
 
     // Close the coin door for Medieval Madness
     //pinmame::set_switch(22, 1);
@@ -363,6 +404,8 @@ fn main() -> Result<(), String> {
     // for i in 0..63 {
     //     pinmame::set_switch(i, 1);
     // }
+
+    let mut display_data = vec![0; 128 * 32];
 
     'main: loop {
         // get the inputs here
@@ -442,25 +485,33 @@ fn main() -> Result<(), String> {
         if !changed_lamps.is_empty() {
             //info!("Update for {} lamps", changed_lamps.len());
             for lamp in changed_lamps {
+                if lamp.state != 0 && lamp.state != 255 {
+                    info!("lamp {}: {}", lamp.lampNo, lamp.state);
+                }
+                tester.lamps[lamp.lampNo as usize] = lamp.state != 0;
                 //info!("lamp {}: {}", lamp.lampNo, lamp.state);
             }
         }
 
+        // TODO we also have a callback for solenoid updates, which should we be using?
         let changed_solenoids = pinmame::get_changed_solenoids();
         if !changed_solenoids.is_empty() {
-            info!("Update for {} solenoids", changed_solenoids.len());
+            //info!("Update for {} solenoids", changed_solenoids.len());
             for solenoid in changed_solenoids {
+                if solenoid.state != 0 && solenoid.state != 1 {
+                    info!("solenoid {}: {}", solenoid.solNo, solenoid.state);
+                }
+                tester.solenoids[solenoid.solNo as usize] = solenoid.state != 0;
                 //info!("solenoid {}: {}", solenoid.solNo, solenoid.state);
             }
         }
 
+        let lamp_size = 8;
+
         if let Some(display_layout) = tester.display_layout {
             match dmd_rx.try_recv() {
-                Ok(display_data) => {
-                    canvas.set_draw_color(pixels::Color::RGB(0, 0, 0));
-                    canvas.clear();
-                    dmd::render_dmd(&display_data, &display_layout, &mut canvas)?;
-                    canvas.present();
+                Ok(received_display_data) => {
+                    display_data = received_display_data;
                 }
                 Err(mpsc::TryRecvError::Empty) => {}
                 Err(mpsc::TryRecvError::Disconnected) => {
@@ -468,6 +519,13 @@ fn main() -> Result<(), String> {
                     break 'main;
                 }
             }
+            render(
+                &mut canvas,
+                &display_data,
+                display_layout,
+                &tester,
+                lamp_size,
+            )?;
         } else {
             info!("display_layout is None");
         }
@@ -475,6 +533,40 @@ fn main() -> Result<(), String> {
 
     pinmame::stop();
 
+    Ok(())
+}
+
+fn render(
+    canvas: &mut sdl2::render::Canvas<sdl2::video::Window>,
+    display_data: &[u8],
+    display_layout: PinmameDisplayLayout,
+    tester: &Tester,
+    lamp_size: u32,
+) -> Result<(), String> {
+    canvas.set_draw_color(pixels::Color::RGB(0, 0, 0));
+    canvas.clear();
+    dmd::render_dmd(0, 0, display_data, &display_layout, canvas)?;
+    dmd::render_lights(
+        0,
+        dmd::dmd_height(&display_layout) + 10,
+        &tester.lamps,
+        canvas,
+        lamp_size,
+    )?;
+    dmd::render_solenoids(
+        300,
+        dmd::dmd_height(&display_layout) + 10,
+        &tester.solenoids,
+        canvas,
+        lamp_size,
+    )?;
+    dmd::render_mechs(
+        0,
+        dmd::dmd_height(&display_layout) + 10 + 100,
+        &tester.mech_info,
+        canvas,
+    )?;
+    canvas.present();
     Ok(())
 }
 

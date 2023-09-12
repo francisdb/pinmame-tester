@@ -1,15 +1,15 @@
 use std::ffi::{c_void, CStr, CString};
 
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 
 use crate::libpinmame::{
     va_list, PinmameConfig, PinmameGame, PinmameGetChangedLamps, PinmameGetChangedSolenoids,
     PinmameGetGame, PinmameGetGames, PinmameGetMaxLamps, PinmameGetMaxSolenoids, PinmameGetSwitch,
-    PinmameIsRunning, PinmameLampState, PinmameMechInfo, PinmameRun, PinmameSetConfig,
-    PinmameSetDmdMode, PinmameSetHandleKeyboard, PinmameSetHandleMechanics, PinmameSetSwitch,
-    PinmameSetSwitches, PinmameSetUserData, PinmameSolenoidState, PinmameStop, PinmameSwitchState,
-    PINMAME_DMD_MODE, PINMAME_DMD_MODE_BRIGHTNESS, PINMAME_DMD_MODE_RAW, PINMAME_LOG_LEVEL,
-    PINMAME_STATUS, PINMAME_STATUS_CONFIG_NOT_SET, PINMAME_STATUS_EMULATOR_NOT_RUNNING,
+    PinmameIsRunning, PinmameLampState, PinmameRun, PinmameSetConfig, PinmameSetDmdMode,
+    PinmameSetHandleKeyboard, PinmameSetHandleMechanics, PinmameSetSwitch, PinmameSetSwitches,
+    PinmameSetUserData, PinmameSolenoidState, PinmameStop, PinmameSwitchState, PINMAME_DMD_MODE,
+    PINMAME_DMD_MODE_BRIGHTNESS, PINMAME_DMD_MODE_RAW, PINMAME_LOG_LEVEL, PINMAME_STATUS,
+    PINMAME_STATUS_CONFIG_NOT_SET, PINMAME_STATUS_EMULATOR_NOT_RUNNING,
     PINMAME_STATUS_GAME_ALREADY_RUNNING, PINMAME_STATUS_GAME_NOT_FOUND,
     PINMAME_STATUS_MECH_HANDLE_MECHANICS, PINMAME_STATUS_MECH_NO_INVALID, PINMAME_STATUS_OK,
 };
@@ -238,29 +238,12 @@ pub extern "C" fn pinmame_on_solenoid_updated_callback(
     _user_data: *const ::std::os::raw::c_void,
 ) {
     unsafe {
-        info!(
+        trace!(
             "OnSolenoidUpdated: solenoid={}, state={}",
             (*solenoid_state).solNo,
             (*solenoid_state).state
         );
     }
-}
-
-//TODO make private
-pub unsafe extern "C" fn pinmame_on_mech_updated_callback(
-    mech_no: i32,
-    mech_info: *mut PinmameMechInfo,
-    _user_data: *const ::std::os::raw::c_void,
-) {
-    info!(
-        "OnMechUpdated: mechNo={}, type={}, length={}, steps={}, pos={}, speed={}",
-        mech_no,
-        (*mech_info).type_,
-        (*mech_info).length,
-        (*mech_info).steps,
-        (*mech_info).pos,
-        (*mech_info).speed
-    );
 }
 
 //TODO make private
