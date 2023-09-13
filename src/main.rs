@@ -1,14 +1,18 @@
+#[macro_use]
+extern crate lazy_static;
+
+use log::{debug, error, info, trace, warn};
 use std::{
+    collections::HashMap,
     ffi::{c_char, c_void, CString},
     sync::mpsc,
 };
-
-use log::{debug, error, info, trace, warn};
 
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::{
     audio::{AudioQueue, AudioSpecDesired},
+    mouse::MouseButton,
     pixels,
 };
 
@@ -20,6 +24,7 @@ use libpinmame::{
 use pinmame::{Game, PinmameStatus};
 
 use crate::{
+    db::SwitchIndex,
     keyboard::map_keycode,
     pinmame::{
         pinmame_on_console_data_updated_callback, pinmame_on_log_message_callback,
@@ -27,6 +32,7 @@ use crate::{
     },
 };
 
+mod db;
 mod dmd;
 mod keyboard;
 #[allow(
@@ -37,6 +43,7 @@ mod keyboard;
 )]
 mod libpinmame;
 mod pinmame;
+mod switches;
 
 extern "C" fn pinmame_on_state_updated_callback(state: i32, _p_user_data: *const c_void) {
     info!("OnStateUpdated(): state={}", state);
@@ -103,7 +110,7 @@ unsafe extern "C" fn pinmame_on_display_updated_callback(
     display_layout: *mut libpinmame::PinmameDisplayLayout,
     _user_data: *const ::std::os::raw::c_void,
 ) {
-    debug!(
+    trace!(
         "OnDisplayUpdated(): index={}, type={}, top={}, left={}, width={}, height={}, depth={}, length={}",
         index,
         (*display_layout).type_,
@@ -260,6 +267,7 @@ struct Tester {
     mech_info: Vec<PinmameMechInfo>,
     lamps: Vec<bool>,
     solenoids: Vec<bool>,
+    switches: HashMap<u32, bool>,
 }
 
 const SCREEN_WIDTH: u32 = 800; // PIXELS_WIDTH * (PIXEL_SIZE + 1);
@@ -277,6 +285,14 @@ fn main() -> Result<(), String> {
     let (sdl_context, mut canvas) = setup_sdl2(SCREEN_WIDTH, SCREEN_HEIGHT)?;
     let mut events = sdl_context.event_pump()?;
     let audio_subsystem = sdl_context.audio()?;
+    let ttf_context = sdl2::ttf::init().map_err(|e| e.to_string())?;
+
+    // Load a font
+    let font = ttf_context.load_font(
+        "res/roboto/Roboto-Regular.ttf",
+        (12_f32 * canvas.scale().0) as u16,
+    )?;
+    //font.set_style(sdl2::ttf::FontStyle::BOLD);
 
     let (dmd_tx, dmd_rx) = mpsc::channel::<Vec<u8>>();
 
@@ -300,6 +316,7 @@ fn main() -> Result<(), String> {
         mech_info: Vec::new(),
         lamps: Vec::new(),
         solenoids: Vec::new(),
+        switches: HashMap::new(),
     };
 
     // get home directory
@@ -350,12 +367,18 @@ fn main() -> Result<(), String> {
     //let medieval_madness_game_name = "mm_109c";
     //let fourx4_game_name = "fourx4";
 
+    // Terminator 2
     let p_name = "t2_l8";
+    let switch_index = &db::T2_SWITCHES;
+
+    // Medieval Madness
+    // let p_name = "mm_109c";
+    // let switch_index = &db::MM_SWITCHES;
 
     pinmame::set_config(&config);
 
     pinmame::set_user_data(&tester as *const Tester as *const std::ffi::c_void);
-    pinmame::set_handle_keyboard(true);
+    pinmame::set_handle_keyboard(false);
     pinmame::set_handle_mechanics(true);
 
     pinmame::set_dmd_mode(DmdMode::Raw);
@@ -432,9 +455,6 @@ fn main() -> Result<(), String> {
                             tester.keyboard_state[PINMAME_KEYCODE_Q as usize] = true;
                             break 'main;
                         }
-                        Keycode::S => {
-                            cirqus_switch_init();
-                        }
                         _ => {}
                     }
                     //println!("key down: {:?}", keycode);
@@ -449,30 +469,72 @@ fn main() -> Result<(), String> {
                     None => (),
                 },
 
-                Event::MouseButtonDown { x, y, .. } => {
+                Event::MouseButtonDown {
+                    x, y, mouse_btn, ..
+                } => {
                     // canvas.set_draw_color(pixels::Color::RGB(0, 0, 0));
                     // canvas.clear();
                     // let color = pixels::Color::RGB(x as u8, y as u8, 255);
                     // let _ = canvas.line(lastx, lasty, x as i16, y as i16, color);
                     // lastx = x as i16;
                     // lasty = y as i16;
-                    println!("mouse btn down at ({},{})", x, y);
+                    // println!("mouse btn down at ({},{})", x, y);
                     let s = pinmame::get_switch(16);
                     println!("switch 16: {}", s);
-                    // canvas.present();
+
+                    if let Some(display_layout) = tester.display_layout {
+                        let switches_at_x = 0;
+                        let switches_at_y =
+                            (dmd::dmd_height(&display_layout) + 10 + 100 + 50) as i32;
+                        if let Some(switch) = switches::switch_id_for_mouse(
+                            x - switches_at_x,
+                            y - switches_at_y,
+                            switch_index,
+                        ) {
+                            match mouse_btn {
+                                MouseButton::Left => {
+                                    println!("switch {} true", switch);
+                                    tester.switches.insert(switch, true);
+                                    pinmame::set_switch(switch as i32, 1);
+                                }
+                                MouseButton::Right => {
+                                    let switched =
+                                        *tester.switches.get(&switch).unwrap_or(&false) ^ true;
+                                    println!("switch {} toggled to {}", switch, switched);
+                                    tester.switches.insert(switch, switched);
+
+                                    pinmame::set_switch(switch as i32, switched as i32);
+                                }
+                                _ => (),
+                            }
+                        }
+                    }
                 }
 
                 Event::MouseButtonUp {
-                    // timestamp,
-                    // window_id,
-                    // which,
-                    // mouse_btn,
-                    // clicks,
-                    x,
-                    y,
-                    ..
+                    x, y, mouse_btn, ..
                 } => {
-                    println!("mouse btn up at ({},{})", x, y);
+                    // println!("mouse btn up at ({},{})", x, y);
+
+                    if let Some(display_layout) = tester.display_layout {
+                        let switches_at_x = 0;
+                        let switches_at_y =
+                            (dmd::dmd_height(&display_layout) + 10 + 100 + 50) as i32;
+                        if let Some(switch) = switches::switch_id_for_mouse(
+                            x - switches_at_x,
+                            y - switches_at_y,
+                            switch_index,
+                        ) {
+                            match mouse_btn {
+                                MouseButton::Left => {
+                                    tester.switches.insert(switch, false);
+                                    println!("switch {} false", switch);
+                                    pinmame::set_switch(switch as i32, 0);
+                                }
+                                _ => (),
+                            }
+                        }
+                    }
                 }
 
                 _ => {}
@@ -521,10 +583,12 @@ fn main() -> Result<(), String> {
             }
             render(
                 &mut canvas,
+                &font,
                 &display_data,
                 display_layout,
                 &tester,
                 lamp_size,
+                switch_index,
             )?;
         } else {
             info!("display_layout is None");
@@ -538,10 +602,12 @@ fn main() -> Result<(), String> {
 
 fn render(
     canvas: &mut sdl2::render::Canvas<sdl2::video::Window>,
+    font: &sdl2::ttf::Font,
     display_data: &[u8],
     display_layout: PinmameDisplayLayout,
     tester: &Tester,
     lamp_size: u32,
+    switch_index: &SwitchIndex,
 ) -> Result<(), String> {
     canvas.set_draw_color(pixels::Color::RGB(0, 0, 0));
     canvas.clear();
@@ -566,25 +632,18 @@ fn render(
         &tester.mech_info,
         canvas,
     )?;
+
+    switches::render_switches(
+        0,
+        dmd::dmd_height(&display_layout) + 10 + 100 + 50,
+        canvas,
+        font,
+        switch_index,
+        &tester.switches,
+    )?;
+
     canvas.present();
     Ok(())
-}
-
-fn cirqus_switch_init() {
-    println!("cirqus_switch_init");
-    // Close the coin door for Cirqus Voltaire
-    pinmame::set_switch(22, 1);
-
-    // Top eddy switch for Cirqus Voltaire
-    pinmame::set_switch(16, 1);
-
-    // opto switches for Cirqus Voltaire (typically closed)
-    pinmame::set_switch(31, 1); // eject
-    pinmame::set_switch(32, 1); // ball 1
-    pinmame::set_switch(33, 1); // ball 2
-    pinmame::set_switch(34, 1); // ball 3
-    pinmame::set_switch(35, 1); // ball 4
-    pinmame::set_switch(36, 1); // popper
 }
 
 fn describe_game(game: Game) -> String {
@@ -604,6 +663,7 @@ fn setup_sdl2(
     let window = video_subsys
         .window("Pinmame rom tester", width, height)
         .position_centered()
+        .allow_highdpi()
         .opengl()
         .build()
         .map_err(|e| e.to_string())?;
@@ -616,6 +676,22 @@ fn setup_sdl2(
         .present_vsync()
         .build()
         .map_err(|e| e.to_string())?;
+
+    // SDL_GetRendererOutputSize(render, &rw, &rh);
+    // in rust
+    let (rw, rh) = canvas.output_size()?;
+    let width_scale = (rw as f32) / (width as f32);
+    let height_scale = (rh as f32) / (height as f32);
+
+    debug!("width_scale: {}", width_scale);
+    debug!("height_scale: {}", height_scale);
+    if width_scale != height_scale {
+        error!("WARNING: width scale != height scale");
+    }
+
+    // SDL_RenderSetScale(render, widthScale, heightScale);
+    // in rust
+    canvas.set_scale(width_scale, height_scale)?;
 
     canvas.set_draw_color(pixels::Color::RGB(0, 0, 0));
     canvas.clear();
