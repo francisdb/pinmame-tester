@@ -6,6 +6,7 @@ if [[ $OSTYPE == 'darwin'* ]]; then
 elif [[ $OSTYPE == 'linux-gnu'* ]]; then
   sudo apt-get install -y libsdl2-dev
   sudo apt-get install -y libsdl2-gfx-dev
+  sudo apt-get install -y libsdl2-ttf-dev
 fi
 rm -rf pinmame
 git clone --depth 1 https://github.com/vpinball/pinmame.git
