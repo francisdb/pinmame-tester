@@ -3,6 +3,7 @@ set -e
 if [[ $OSTYPE == 'darwin'* ]]; then
   brew install sdl2
   brew install sdl2_gfx
+  brew install sdl2_ttf
 elif [[ $OSTYPE == 'linux-gnu'* ]]; then
   sudo apt-get install -y libsdl2-dev
   sudo apt-get install -y libsdl2-gfx-dev
