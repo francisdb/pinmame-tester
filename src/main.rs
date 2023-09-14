@@ -23,12 +23,13 @@ use libpinmame::{
 };
 use pinmame::{Game, PinmameStatus};
 
-use db::SwitchIndex;
-use keyboard::map_keycode;
-
-use pinmame::{
-    pinmame_on_console_data_updated_callback, pinmame_on_log_message_callback,
-    pinmame_on_solenoid_updated_callback, DmdMode,
+use crate::{
+    db::SwitchIndex,
+    keyboard::map_keycode,
+    pinmame::{
+        pinmame_on_console_data_updated_callback, pinmame_on_log_message_callback,
+        pinmame_on_solenoid_updated_callback, DmdMode,
+    },
 };
 
 mod db;
