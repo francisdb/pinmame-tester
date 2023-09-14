@@ -11,7 +11,8 @@ elif [[ $OSTYPE == 'linux-gnu'* ]]; then
   sudo apt-get install -y libsdl2-ttf-dev
 fi
 rm -rf pinmame
-git clone --depth 1 https://github.com/vpinball/pinmame.git
+git clone --depth 1 https://github.com/vpinball/pinmame.git pinmame
+rm -rf pinmame/.git
 cd pinmame
 if [[ $OSTYPE == 'darwin'* ]]; then
   if [[ $(uname -m) == 'arm64' ]]; then
