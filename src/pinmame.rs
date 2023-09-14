@@ -256,6 +256,7 @@ pub unsafe extern "C" fn pinmame_on_console_data_updated_callback(
 }
 
 //TODO make private
+#[cfg(target_os = "macos")]
 pub unsafe extern "C" fn pinmame_on_log_message_callback(
     log_level: u32,
     format: *const ::std::os::raw::c_char,

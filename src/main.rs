@@ -23,13 +23,12 @@ use libpinmame::{
 };
 use pinmame::{Game, PinmameStatus};
 
-use crate::{
-    db::SwitchIndex,
-    keyboard::map_keycode,
-    pinmame::{
-        pinmame_on_console_data_updated_callback, pinmame_on_log_message_callback,
-        pinmame_on_solenoid_updated_callback, DmdMode,
-    },
+use db::SwitchIndex;
+use keyboard::map_keycode;
+#[cfg(target_os = "macos")]
+use pinmame::pinmame_on_log_message_callback;
+use pinmame::{
+    pinmame_on_console_data_updated_callback, pinmame_on_solenoid_updated_callback, DmdMode,
 };
 
 mod db;
@@ -329,22 +328,7 @@ fn main() -> Result<(), String> {
     for (i, c) in path.as_bytes_with_nul().iter().enumerate() {
         vpm_path[i] = *c as c_char;
     }
-    let config = PinmameConfig {
-        audioFormat: PINMAME_AUDIO_FORMAT_AUDIO_FORMAT_INT16,
-        sampleRate: 44100,
-        vpmPath: vpm_path,
-        cb_OnStateUpdated: Some(pinmame_on_state_updated_callback),
-        cb_OnDisplayAvailable: Some(pinmame_on_display_available_callback),
-        cb_OnDisplayUpdated: Some(pinmame_on_display_updated_callback),
-        cb_OnAudioAvailable: Some(pinmame_on_audio_available_callback),
-        cb_OnAudioUpdated: Some(pinmame_on_audio_updated_callback),
-        cb_OnMechAvailable: Some(pinmame_on_mech_available_callback),
-        cb_OnMechUpdated: Some(pinmame_on_mech_updated_callback),
-        cb_OnSolenoidUpdated: Some(pinmame_on_solenoid_updated_callback),
-        cb_OnConsoleDataUpdated: Some(pinmame_on_console_data_updated_callback),
-        fn_IsKeyPressed: Some(pinmame_is_key_pressed_callback),
-        cb_OnLogMessage: Some(pinmame_on_log_message_callback),
-    };
+    let config = build_config(vpm_path);
 
     //PinmameRun("mm_109c"); // Medieval Madness
     //PinmameRun("fh_906h"); // FunHouse
@@ -598,6 +582,46 @@ fn main() -> Result<(), String> {
     pinmame::stop();
 
     Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn build_config(vpm_path: [i8; 512]) -> PinmameConfig {
+    PinmameConfig {
+        audioFormat: PINMAME_AUDIO_FORMAT_AUDIO_FORMAT_INT16,
+        sampleRate: 44100,
+        vpmPath: vpm_path,
+        cb_OnStateUpdated: Some(pinmame_on_state_updated_callback),
+        cb_OnDisplayAvailable: Some(pinmame_on_display_available_callback),
+        cb_OnDisplayUpdated: Some(pinmame_on_display_updated_callback),
+        cb_OnAudioAvailable: Some(pinmame_on_audio_available_callback),
+        cb_OnAudioUpdated: Some(pinmame_on_audio_updated_callback),
+        cb_OnMechAvailable: Some(pinmame_on_mech_available_callback),
+        cb_OnMechUpdated: Some(pinmame_on_mech_updated_callback),
+        cb_OnSolenoidUpdated: Some(pinmame_on_solenoid_updated_callback),
+        cb_OnConsoleDataUpdated: Some(pinmame_on_console_data_updated_callback),
+        fn_IsKeyPressed: Some(pinmame_is_key_pressed_callback),
+        cb_OnLogMessage: Some(pinmame_on_log_message_callback),
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn build_config(vpm_path: [i8; 512]) -> PinmameConfig {
+    PinmameConfig {
+        audioFormat: PINMAME_AUDIO_FORMAT_AUDIO_FORMAT_INT16,
+        sampleRate: 44100,
+        vpmPath: vpm_path,
+        cb_OnStateUpdated: Some(pinmame_on_state_updated_callback),
+        cb_OnDisplayAvailable: Some(pinmame_on_display_available_callback),
+        cb_OnDisplayUpdated: Some(pinmame_on_display_updated_callback),
+        cb_OnAudioAvailable: Some(pinmame_on_audio_available_callback),
+        cb_OnAudioUpdated: Some(pinmame_on_audio_updated_callback),
+        cb_OnMechAvailable: Some(pinmame_on_mech_available_callback),
+        cb_OnMechUpdated: Some(pinmame_on_mech_updated_callback),
+        cb_OnSolenoidUpdated: Some(pinmame_on_solenoid_updated_callback),
+        cb_OnConsoleDataUpdated: Some(pinmame_on_console_data_updated_callback),
+        fn_IsKeyPressed: Some(pinmame_is_key_pressed_callback),
+        cb_OnLogMessage: None,
+    }
 }
 
 fn render(
