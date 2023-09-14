@@ -8,7 +8,6 @@ fn main() {
         .join("pinmame")
         .join("build")
         .join("Release");
-
     println!("cargo:rustc-link-search=native={}", pinmame_dir.display());
 
     // TODO get rid of this part and have libpinmame compile as a static library on linux
