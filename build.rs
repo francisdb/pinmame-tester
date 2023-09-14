@@ -9,13 +9,14 @@ fn main() {
         .join("build")
         .join("Release");
 
+    println!("cargo:rustc-link-search=native={}", pinmame_dir.display());
+
     // TODO get rid of this part and have libpinmame compile as a static library on linux
     if cfg!(target_os = "linux") {
         println!("cargo:rustc-link-lib=dylib=pinmame");
         println!("cargo:rustc-link-arg=-Wl,-rpath,{}/", pinmame_dir.display());
     } else {
         println!("cargo:rustc-link-lib=static=pinmame");
-        println!("cargo:rustc-link-search=native={}", pinmame_dir.display());
     }
 
     // Tell cargo to invalidate the built crate whenever the wrapper changes
