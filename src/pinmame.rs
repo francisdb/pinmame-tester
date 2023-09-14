@@ -3,8 +3,8 @@ use std::ffi::{c_void, CStr, CString};
 use log::{debug, error, info, trace, warn};
 
 use crate::libpinmame::{
-    va_list, PinmameConfig, PinmameGame, PinmameGetChangedLamps, PinmameGetChangedSolenoids,
-    PinmameGetGame, PinmameGetGames, PinmameGetMaxLamps, PinmameGetMaxSolenoids, PinmameGetSwitch,
+    PinmameConfig, PinmameGame, PinmameGetChangedLamps, PinmameGetChangedSolenoids, PinmameGetGame,
+    PinmameGetGames, PinmameGetMaxLamps, PinmameGetMaxSolenoids, PinmameGetSwitch,
     PinmameIsRunning, PinmameLampState, PinmameRun, PinmameSetConfig, PinmameSetDmdMode,
     PinmameSetHandleKeyboard, PinmameSetHandleMechanics, PinmameSetSwitch, PinmameSetSwitches,
     PinmameSetUserData, PinmameSolenoidState, PinmameStop, PinmameSwitchState, PINMAME_DMD_MODE,
@@ -256,11 +256,23 @@ pub unsafe extern "C" fn pinmame_on_console_data_updated_callback(
 }
 
 //TODO make private
-#[cfg(target_os = "macos")]
+#[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
 pub unsafe extern "C" fn pinmame_on_log_message_callback(
     log_level: u32,
     format: *const ::std::os::raw::c_char,
-    args: va_list,
+    args: *mut crate::libpinmame::__va_list_tag,
+    _user_data: *const ::std::os::raw::c_void,
+) {
+    let str = unsafe { vsprintf::vsprintf(format, args).unwrap() };
+    on_log_message(log_level, str);
+}
+
+//TODO make private
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+pub unsafe extern "C" fn pinmame_on_log_message_callback(
+    log_level: u32,
+    format: *const ::std::os::raw::c_char,
+    args: crate::libpinmame::va_list,
     _user_data: *const ::std::os::raw::c_void,
 ) {
     let str = unsafe { vsprintf::vsprintf(format, args).unwrap() };
