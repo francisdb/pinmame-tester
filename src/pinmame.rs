@@ -4,12 +4,12 @@ use log::{debug, error, info, trace, warn};
 
 use crate::libpinmame::{
     PinmameConfig, PinmameGame, PinmameGetChangedLamps, PinmameGetChangedSolenoids, PinmameGetGame,
-    PinmameGetGames, PinmameGetMaxLamps, PinmameGetMaxSolenoids, PinmameGetSwitch,
-    PinmameIsRunning, PinmameLampState, PinmameRun, PinmameSetConfig, PinmameSetDmdMode,
-    PinmameSetHandleKeyboard, PinmameSetHandleMechanics, PinmameSetSwitch, PinmameSetSwitches,
-    PinmameSetUserData, PinmameSolenoidState, PinmameStop, PinmameSwitchState, PINMAME_DMD_MODE,
-    PINMAME_DMD_MODE_BRIGHTNESS, PINMAME_DMD_MODE_RAW, PINMAME_LOG_LEVEL, PINMAME_STATUS,
-    PINMAME_STATUS_CONFIG_NOT_SET, PINMAME_STATUS_EMULATOR_NOT_RUNNING,
+    PinmameGetGames, PinmameGetMaxLamps, PinmameGetMaxSolenoids, PinmameGetSwitch, PinmameIsPaused,
+    PinmameIsRunning, PinmameLampState, PinmamePause, PinmameReset, PinmameRun, PinmameSetConfig,
+    PinmameSetDmdMode, PinmameSetHandleKeyboard, PinmameSetHandleMechanics, PinmameSetSwitch,
+    PinmameSetSwitches, PinmameSetUserData, PinmameSolenoidState, PinmameStop, PinmameSwitchState,
+    PINMAME_DMD_MODE, PINMAME_DMD_MODE_BRIGHTNESS, PINMAME_DMD_MODE_RAW, PINMAME_LOG_LEVEL,
+    PINMAME_STATUS, PINMAME_STATUS_CONFIG_NOT_SET, PINMAME_STATUS_EMULATOR_NOT_RUNNING,
     PINMAME_STATUS_GAME_ALREADY_RUNNING, PINMAME_STATUS_GAME_NOT_FOUND,
     PINMAME_STATUS_MECH_HANDLE_MECHANICS, PINMAME_STATUS_MECH_NO_INVALID, PINMAME_STATUS_OK,
 };
@@ -113,6 +113,29 @@ pub fn is_running() -> bool {
 
 pub fn stop() {
     unsafe { PinmameStop() };
+}
+
+pub fn reset() {
+    unsafe { PinmameReset() };
+}
+
+pub fn pause() -> Result<(), PINMAME_STATUS> {
+    let status = unsafe { PinmamePause(1) };
+    match status {
+        PINMAME_STATUS_OK => Ok(()),
+        _ => Err(status.into()),
+    }
+}
+pub fn continue_() -> Result<(), PINMAME_STATUS> {
+    let status = unsafe { PinmamePause(0) };
+    match status {
+        PINMAME_STATUS_OK => Ok(()),
+        _ => Err(status.into()),
+    }
+}
+
+pub fn is_paused() -> bool {
+    unsafe { PinmameIsPaused() > 0 }
 }
 
 pub fn get_games() -> Result<Vec<Game>, PinmameStatus> {
@@ -257,15 +280,15 @@ pub unsafe extern "C" fn pinmame_on_console_data_updated_callback(
 
 // see https://github.com/rust-lang/rust-bindgen/issues/2631
 #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
-type va_list_type = *mut crate::libpinmame::__va_list_tag;
+type VaListType = *mut crate::libpinmame::__va_list_tag;
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-type va_list_type = crate::libpinmame::va_list;
+type VaListType = crate::libpinmame::va_list;
 
 //TODO make private
 pub unsafe extern "C" fn pinmame_on_log_message_callback(
     log_level: u32,
     format: *const ::std::os::raw::c_char,
-    args: va_list_type,
+    args: VaListType,
     _user_data: *const ::std::os::raw::c_void,
 ) {
     let str = unsafe { vsprintf::vsprintf(format, args).unwrap() };
