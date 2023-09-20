@@ -34,7 +34,9 @@ jobs:
     - name: Get dependencies
       run: ./external.sh
     - name: (Re)Generate bindings
-      run: ./genbind.sh  
+      run: ./genbind.sh
+    - name: Check formatting
+      run: cargo fmt --all --check -- --color=always
     - name: Build
       run: cargo build --verbose
     - name: Run tests
