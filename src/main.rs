@@ -18,7 +18,8 @@ use sdl2::{
 
 use libpinmame::{
     PinmameAudioInfo, PinmameConfig, PinmameDisplayLayout, PinmameMechInfo,
-    PINMAME_AUDIO_FORMAT_PINMAME_AUDIO_FORMAT_INT16, PINMAME_KEYCODE_PINMAME_KEYCODE_ESCAPE, PINMAME_KEYCODE_PINMAME_KEYCODE_MENU, PINMAME_KEYCODE_PINMAME_KEYCODE_Q
+    PINMAME_AUDIO_FORMAT_PINMAME_AUDIO_FORMAT_INT16, PINMAME_KEYCODE_PINMAME_KEYCODE_ESCAPE,
+    PINMAME_KEYCODE_PINMAME_KEYCODE_MENU, PINMAME_KEYCODE_PINMAME_KEYCODE_Q,
 };
 use pinmame::{Game, PinmameStatus};
 
@@ -55,7 +56,8 @@ extern "C" fn pinmame_on_state_updated_callback(state: i32, _p_user_data: *const
         let mech_config = libpinmame::PinmameMechConfig {
             type_: (libpinmame::PINMAME_MECH_FLAGS_PINMAME_MECH_FLAGS_NONLINEAR
                 | libpinmame::PINMAME_MECH_FLAGS_PINMAME_MECH_FLAGS_REVERSE
-                | libpinmame::PINMAME_MECH_FLAGS_PINMAME_MECH_FLAGS_ONESOL) as i32,
+                | libpinmame::PINMAME_MECH_FLAGS_PINMAME_MECH_FLAGS_ONESOL)
+                as i32,
             sol1: 11,
             sol2: 0,
             length: 240,
@@ -247,10 +249,7 @@ extern "C" fn pinmame_on_sound_command_callback(
     _p_user_data: *const ::std::os::raw::c_void,
 ) {
     // TODO
-    info!(
-        "OnSoundCommand(): boardNo={}, cmd={}",
-        board_no, cmd
-    );
+    info!("OnSoundCommand(): boardNo={}, cmd={}", board_no, cmd);
 }
 
 extern "C" fn pinmame_is_key_pressed_callback(
@@ -459,11 +458,13 @@ fn main() -> Result<(), String> {
                     }
                     match keycode {
                         Keycode::Escape => {
-                            tester.keyboard_state[PINMAME_KEYCODE_PINMAME_KEYCODE_ESCAPE as usize] = true;
+                            tester.keyboard_state
+                                [PINMAME_KEYCODE_PINMAME_KEYCODE_ESCAPE as usize] = true;
                             break 'main;
                         }
                         Keycode::Q => {
-                            tester.keyboard_state[PINMAME_KEYCODE_PINMAME_KEYCODE_Q as usize] = true;
+                            tester.keyboard_state[PINMAME_KEYCODE_PINMAME_KEYCODE_Q as usize] =
+                                true;
                             break 'main;
                         }
                         _ => {}

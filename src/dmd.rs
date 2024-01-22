@@ -3,7 +3,9 @@ use std::ffi::{c_char, CString};
 use log::warn;
 use sdl2::{pixels, rect::Rect};
 
-use crate::libpinmame::{PinmameDisplayLayout, PinmameMechInfo, PINMAME_DISPLAY_TYPE_PINMAME_DISPLAY_TYPE_SEG16S};
+use crate::libpinmame::{
+    PinmameDisplayLayout, PinmameMechInfo, PINMAME_DISPLAY_TYPE_PINMAME_DISPLAY_TYPE_SEG16S,
+};
 
 const PIXEL_SIZE: u32 = 3;
 
@@ -153,11 +155,12 @@ pub(crate) fn dump_alphanumeric(
                 "         ",
             ];
 
-            let segments = if (*display_layout).type_ == PINMAME_DISPLAY_TYPE_PINMAME_DISPLAY_TYPE_SEG16S {
-                segments_16s
-            } else {
-                segments_16c
-            };
+            let segments =
+                if (*display_layout).type_ == PINMAME_DISPLAY_TYPE_PINMAME_DISPLAY_TYPE_SEG16S {
+                    segments_16s
+                } else {
+                    segments_16c
+                };
 
             // 		for (int row = 0; row < 8; row++) {
             // 			for (int column = 0; column < 9; column++) {

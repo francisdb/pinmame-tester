@@ -2,7 +2,23 @@ use std::ffi::{c_void, CStr, CString};
 
 use log::{debug, error, info, trace, warn};
 
-use crate::libpinmame::{PinmameConfig, PinmameGame, PinmameGetChangedLamps, PinmameGetChangedSolenoids, PinmameGetGame, PinmameGetGames, PinmameGetMaxLamps, PinmameGetMaxSolenoids, PinmameGetSwitch, PinmameIsPaused, PinmameIsRunning, PinmameLampState, PinmamePause, PinmameReset, PinmameRun, PinmameSetConfig, PinmameSetDmdMode, PinmameSetHandleKeyboard, PinmameSetHandleMechanics, PinmameSetSwitch, PinmameSetSwitches, PinmameSetUserData, PinmameSolenoidState, PinmameStop, PinmameSwitchState, PINMAME_DMD_MODE, PINMAME_LOG_LEVEL, PINMAME_STATUS, PINMAME_STATUS_PINMAME_STATUS_CONFIG_NOT_SET, PINMAME_STATUS_PINMAME_STATUS_EMULATOR_NOT_RUNNING, PINMAME_STATUS_PINMAME_STATUS_GAME_ALREADY_RUNNING, PINMAME_STATUS_PINMAME_STATUS_GAME_NOT_FOUND, PINMAME_STATUS_PINMAME_STATUS_MECH_HANDLE_MECHANICS, PINMAME_STATUS_PINMAME_STATUS_MECH_NO_INVALID, PINMAME_STATUS_PINMAME_STATUS_OK, PINMAME_LOG_LEVEL_PINMAME_LOG_LEVEL_INFO, PINMAME_LOG_LEVEL_PINMAME_LOG_LEVEL_ERROR, PINMAME_LOG_LEVEL_PINMAME_LOG_LEVEL_DEBUG, PINMAME_DMD_MODE_PINMAME_DMD_MODE_BRIGHTNESS, PINMAME_DMD_MODE_PINMAME_DMD_MODE_RAW};
+use crate::libpinmame::{
+    PinmameConfig, PinmameGame, PinmameGetChangedLamps, PinmameGetChangedSolenoids, PinmameGetGame,
+    PinmameGetGames, PinmameGetMaxLamps, PinmameGetMaxSolenoids, PinmameGetSwitch, PinmameIsPaused,
+    PinmameIsRunning, PinmameLampState, PinmamePause, PinmameReset, PinmameRun, PinmameSetConfig,
+    PinmameSetDmdMode, PinmameSetHandleKeyboard, PinmameSetHandleMechanics, PinmameSetSwitch,
+    PinmameSetSwitches, PinmameSetUserData, PinmameSolenoidState, PinmameStop, PinmameSwitchState,
+    PINMAME_DMD_MODE, PINMAME_DMD_MODE_PINMAME_DMD_MODE_BRIGHTNESS,
+    PINMAME_DMD_MODE_PINMAME_DMD_MODE_RAW, PINMAME_LOG_LEVEL,
+    PINMAME_LOG_LEVEL_PINMAME_LOG_LEVEL_DEBUG, PINMAME_LOG_LEVEL_PINMAME_LOG_LEVEL_ERROR,
+    PINMAME_LOG_LEVEL_PINMAME_LOG_LEVEL_INFO, PINMAME_STATUS,
+    PINMAME_STATUS_PINMAME_STATUS_CONFIG_NOT_SET,
+    PINMAME_STATUS_PINMAME_STATUS_EMULATOR_NOT_RUNNING,
+    PINMAME_STATUS_PINMAME_STATUS_GAME_ALREADY_RUNNING,
+    PINMAME_STATUS_PINMAME_STATUS_GAME_NOT_FOUND,
+    PINMAME_STATUS_PINMAME_STATUS_MECH_HANDLE_MECHANICS,
+    PINMAME_STATUS_PINMAME_STATUS_MECH_NO_INVALID, PINMAME_STATUS_PINMAME_STATUS_OK,
+};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PinmameStatus {
@@ -23,7 +39,9 @@ impl From<PINMAME_STATUS> for PinmameStatus {
             PINMAME_STATUS_PINMAME_STATUS_GAME_NOT_FOUND => PinmameStatus::GameNotFound,
             PINMAME_STATUS_PINMAME_STATUS_GAME_ALREADY_RUNNING => PinmameStatus::GameAlreadyRunning,
             PINMAME_STATUS_PINMAME_STATUS_EMULATOR_NOT_RUNNING => PinmameStatus::EmulatorNotRunning,
-            PINMAME_STATUS_PINMAME_STATUS_MECH_HANDLE_MECHANICS => PinmameStatus::MechHandleMechanics,
+            PINMAME_STATUS_PINMAME_STATUS_MECH_HANDLE_MECHANICS => {
+                PinmameStatus::MechHandleMechanics
+            }
             PINMAME_STATUS_PINMAME_STATUS_MECH_NO_INVALID => PinmameStatus::MechNoInvalid,
             _ => unreachable!("Unknown status code"),
         }
