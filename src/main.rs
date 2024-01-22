@@ -18,8 +18,7 @@ use sdl2::{
 
 use libpinmame::{
     PinmameAudioInfo, PinmameConfig, PinmameDisplayLayout, PinmameMechInfo,
-    PINMAME_AUDIO_FORMAT_AUDIO_FORMAT_INT16, PINMAME_KEYCODE_ESCAPE, PINMAME_KEYCODE_MENU,
-    PINMAME_KEYCODE_Q,
+    PINMAME_AUDIO_FORMAT_PINMAME_AUDIO_FORMAT_INT16, PINMAME_KEYCODE_PINMAME_KEYCODE_ESCAPE, PINMAME_KEYCODE_PINMAME_KEYCODE_MENU, PINMAME_KEYCODE_PINMAME_KEYCODE_Q
 };
 use pinmame::{Game, PinmameStatus};
 
@@ -31,7 +30,6 @@ use crate::{
         pinmame_on_solenoid_updated_callback, DmdMode,
     },
 };
-
 mod db;
 mod dmd;
 mod keyboard;
@@ -55,9 +53,9 @@ extern "C" fn pinmame_on_state_updated_callback(state: i32, _p_user_data: *const
         // We had to come up with our own defaults
         // Are these correct?
         let mech_config = libpinmame::PinmameMechConfig {
-            type_: (libpinmame::PINMAME_MECH_FLAGS_NONLINEAR
-                | libpinmame::PINMAME_MECH_FLAGS_REVERSE
-                | libpinmame::PINMAME_MECH_FLAGS_ONESOL) as i32,
+            type_: (libpinmame::PINMAME_MECH_FLAGS_PINMAME_MECH_FLAGS_NONLINEAR
+                | libpinmame::PINMAME_MECH_FLAGS_PINMAME_MECH_FLAGS_REVERSE
+                | libpinmame::PINMAME_MECH_FLAGS_PINMAME_MECH_FLAGS_ONESOL) as i32,
             sol1: 11,
             sol2: 0,
             length: 240,
@@ -123,8 +121,8 @@ unsafe extern "C" fn pinmame_on_display_updated_callback(
     );
 
     if !_display_data.is_null() {
-        if ((*display_layout).type_ & libpinmame::PINMAME_DISPLAY_TYPE_DMD)
-            == libpinmame::PINMAME_DISPLAY_TYPE_DMD
+        if ((*display_layout).type_ & libpinmame::PINMAME_DISPLAY_TYPE_PINMAME_DISPLAY_TYPE_DMD)
+            == libpinmame::PINMAME_DISPLAY_TYPE_PINMAME_DISPLAY_TYPE_DMD
         {
             let tester: &mut Tester = unsafe { &mut *(_user_data as *mut Tester) };
             match tester.display_data.send(
@@ -152,8 +150,8 @@ unsafe extern "C" fn pinmame_on_audio_available_callback(
 ) -> i32 {
     let audio_info = audio_info.as_ref().unwrap();
     let format = match audio_info.format {
-        libpinmame::PINMAME_AUDIO_FORMAT_AUDIO_FORMAT_INT16 => "int16",
-        libpinmame::PINMAME_AUDIO_FORMAT_AUDIO_FORMAT_FLOAT => "float",
+        libpinmame::PINMAME_AUDIO_FORMAT_PINMAME_AUDIO_FORMAT_INT16 => "int16",
+        libpinmame::PINMAME_AUDIO_FORMAT_PINMAME_AUDIO_FORMAT_FLOAT => "float",
         other => unreachable!("Unknown audio format: {}", other),
     };
     info!(
@@ -243,6 +241,18 @@ extern "C" fn pinmame_on_audio_updated_callback(
     samples
 }
 
+extern "C" fn pinmame_on_sound_command_callback(
+    board_no: ::std::os::raw::c_int,
+    cmd: ::std::os::raw::c_int,
+    _p_user_data: *const ::std::os::raw::c_void,
+) {
+    // TODO
+    info!(
+        "OnSoundCommand(): boardNo={}, cmd={}",
+        board_no, cmd
+    );
+}
+
 extern "C" fn pinmame_is_key_pressed_callback(
     _keycode: libpinmame::PINMAME_KEYCODE,
     _user_data: *const ::std::os::raw::c_void,
@@ -263,7 +273,7 @@ struct Tester {
     audio_info: Option<PinmameAudioInfo>,
     display_layout: Option<PinmameDisplayLayout>,
     display_data: mpsc::Sender<Vec<u8>>,
-    keyboard_state: [bool; (PINMAME_KEYCODE_MENU + 1) as usize],
+    keyboard_state: [bool; (PINMAME_KEYCODE_PINMAME_KEYCODE_MENU + 1) as usize],
     mech_info: Vec<PinmameMechInfo>,
     lamps: Vec<bool>,
     solenoids: Vec<bool>,
@@ -312,7 +322,7 @@ fn main() -> Result<(), String> {
         audio_info: None,
         display_layout: None,
         display_data: dmd_tx,
-        keyboard_state: [false; (PINMAME_KEYCODE_MENU + 1) as usize],
+        keyboard_state: [false; (PINMAME_KEYCODE_PINMAME_KEYCODE_MENU + 1) as usize],
         mech_info: Vec::new(),
         lamps: Vec::new(),
         solenoids: Vec::new(),
@@ -330,7 +340,7 @@ fn main() -> Result<(), String> {
         vpm_path[i] = *c as c_char;
     }
     let config = PinmameConfig {
-        audioFormat: PINMAME_AUDIO_FORMAT_AUDIO_FORMAT_INT16,
+        audioFormat: PINMAME_AUDIO_FORMAT_PINMAME_AUDIO_FORMAT_INT16,
         sampleRate: 44100,
         vpmPath: vpm_path,
         cb_OnStateUpdated: Some(pinmame_on_state_updated_callback),
@@ -344,6 +354,7 @@ fn main() -> Result<(), String> {
         cb_OnConsoleDataUpdated: Some(pinmame_on_console_data_updated_callback),
         fn_IsKeyPressed: Some(pinmame_is_key_pressed_callback),
         cb_OnLogMessage: Some(pinmame_on_log_message_callback),
+        cb_OnSoundCommand: Some(pinmame_on_sound_command_callback),
     };
 
     //PinmameRun("mm_109c"); // Medieval Madness
@@ -448,11 +459,11 @@ fn main() -> Result<(), String> {
                     }
                     match keycode {
                         Keycode::Escape => {
-                            tester.keyboard_state[PINMAME_KEYCODE_ESCAPE as usize] = true;
+                            tester.keyboard_state[PINMAME_KEYCODE_PINMAME_KEYCODE_ESCAPE as usize] = true;
                             break 'main;
                         }
                         Keycode::Q => {
-                            tester.keyboard_state[PINMAME_KEYCODE_Q as usize] = true;
+                            tester.keyboard_state[PINMAME_KEYCODE_PINMAME_KEYCODE_Q as usize] = true;
                             break 'main;
                         }
                         _ => {}

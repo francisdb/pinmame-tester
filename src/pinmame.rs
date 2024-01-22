@@ -2,17 +2,7 @@ use std::ffi::{c_void, CStr, CString};
 
 use log::{debug, error, info, trace, warn};
 
-use crate::libpinmame::{
-    PinmameConfig, PinmameGame, PinmameGetChangedLamps, PinmameGetChangedSolenoids, PinmameGetGame,
-    PinmameGetGames, PinmameGetMaxLamps, PinmameGetMaxSolenoids, PinmameGetSwitch, PinmameIsPaused,
-    PinmameIsRunning, PinmameLampState, PinmamePause, PinmameReset, PinmameRun, PinmameSetConfig,
-    PinmameSetDmdMode, PinmameSetHandleKeyboard, PinmameSetHandleMechanics, PinmameSetSwitch,
-    PinmameSetSwitches, PinmameSetUserData, PinmameSolenoidState, PinmameStop, PinmameSwitchState,
-    PINMAME_DMD_MODE, PINMAME_DMD_MODE_BRIGHTNESS, PINMAME_DMD_MODE_RAW, PINMAME_LOG_LEVEL,
-    PINMAME_STATUS, PINMAME_STATUS_CONFIG_NOT_SET, PINMAME_STATUS_EMULATOR_NOT_RUNNING,
-    PINMAME_STATUS_GAME_ALREADY_RUNNING, PINMAME_STATUS_GAME_NOT_FOUND,
-    PINMAME_STATUS_MECH_HANDLE_MECHANICS, PINMAME_STATUS_MECH_NO_INVALID, PINMAME_STATUS_OK,
-};
+use crate::libpinmame::{PinmameConfig, PinmameGame, PinmameGetChangedLamps, PinmameGetChangedSolenoids, PinmameGetGame, PinmameGetGames, PinmameGetMaxLamps, PinmameGetMaxSolenoids, PinmameGetSwitch, PinmameIsPaused, PinmameIsRunning, PinmameLampState, PinmamePause, PinmameReset, PinmameRun, PinmameSetConfig, PinmameSetDmdMode, PinmameSetHandleKeyboard, PinmameSetHandleMechanics, PinmameSetSwitch, PinmameSetSwitches, PinmameSetUserData, PinmameSolenoidState, PinmameStop, PinmameSwitchState, PINMAME_DMD_MODE, PINMAME_LOG_LEVEL, PINMAME_STATUS, PINMAME_STATUS_PINMAME_STATUS_CONFIG_NOT_SET, PINMAME_STATUS_PINMAME_STATUS_EMULATOR_NOT_RUNNING, PINMAME_STATUS_PINMAME_STATUS_GAME_ALREADY_RUNNING, PINMAME_STATUS_PINMAME_STATUS_GAME_NOT_FOUND, PINMAME_STATUS_PINMAME_STATUS_MECH_HANDLE_MECHANICS, PINMAME_STATUS_PINMAME_STATUS_MECH_NO_INVALID, PINMAME_STATUS_PINMAME_STATUS_OK, PINMAME_LOG_LEVEL_PINMAME_LOG_LEVEL_INFO, PINMAME_LOG_LEVEL_PINMAME_LOG_LEVEL_ERROR, PINMAME_LOG_LEVEL_PINMAME_LOG_LEVEL_DEBUG, PINMAME_DMD_MODE_PINMAME_DMD_MODE_BRIGHTNESS, PINMAME_DMD_MODE_PINMAME_DMD_MODE_RAW};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PinmameStatus {
@@ -28,13 +18,13 @@ pub enum PinmameStatus {
 impl From<PINMAME_STATUS> for PinmameStatus {
     fn from(status: u32) -> Self {
         match status {
-            PINMAME_STATUS_OK => PinmameStatus::Ok,
-            PINMAME_STATUS_CONFIG_NOT_SET => PinmameStatus::ConfigNotSet,
-            PINMAME_STATUS_GAME_NOT_FOUND => PinmameStatus::GameNotFound,
-            PINMAME_STATUS_GAME_ALREADY_RUNNING => PinmameStatus::GameAlreadyRunning,
-            PINMAME_STATUS_EMULATOR_NOT_RUNNING => PinmameStatus::EmulatorNotRunning,
-            PINMAME_STATUS_MECH_HANDLE_MECHANICS => PinmameStatus::MechHandleMechanics,
-            PINMAME_STATUS_MECH_NO_INVALID => PinmameStatus::MechNoInvalid,
+            PINMAME_STATUS_PINMAME_STATUS_OK => PinmameStatus::Ok,
+            PINMAME_STATUS_PINMAME_STATUS_CONFIG_NOT_SET => PinmameStatus::ConfigNotSet,
+            PINMAME_STATUS_PINMAME_STATUS_GAME_NOT_FOUND => PinmameStatus::GameNotFound,
+            PINMAME_STATUS_PINMAME_STATUS_GAME_ALREADY_RUNNING => PinmameStatus::GameAlreadyRunning,
+            PINMAME_STATUS_PINMAME_STATUS_EMULATOR_NOT_RUNNING => PinmameStatus::EmulatorNotRunning,
+            PINMAME_STATUS_PINMAME_STATUS_MECH_HANDLE_MECHANICS => PinmameStatus::MechHandleMechanics,
+            PINMAME_STATUS_PINMAME_STATUS_MECH_NO_INVALID => PinmameStatus::MechNoInvalid,
             _ => unreachable!("Unknown status code"),
         }
     }
@@ -81,8 +71,8 @@ pub enum DmdMode {
 impl From<DmdMode> for PINMAME_DMD_MODE {
     fn from(dmd_mode: DmdMode) -> Self {
         match dmd_mode {
-            DmdMode::Brightness => PINMAME_DMD_MODE_BRIGHTNESS,
-            DmdMode::Raw => PINMAME_DMD_MODE_RAW,
+            DmdMode::Brightness => PINMAME_DMD_MODE_PINMAME_DMD_MODE_BRIGHTNESS,
+            DmdMode::Raw => PINMAME_DMD_MODE_PINMAME_DMD_MODE_RAW,
         }
     }
 }
@@ -122,14 +112,14 @@ pub fn reset() {
 pub fn pause() -> Result<(), PINMAME_STATUS> {
     let status = unsafe { PinmamePause(1) };
     match status {
-        PINMAME_STATUS_OK => Ok(()),
+        PINMAME_STATUS_PINMAME_STATUS_OK => Ok(()),
         _ => Err(status.into()),
     }
 }
 pub fn continue_() -> Result<(), PINMAME_STATUS> {
     let status = unsafe { PinmamePause(0) };
     match status {
-        PINMAME_STATUS_OK => Ok(()),
+        PINMAME_STATUS_PINMAME_STATUS_OK => Ok(()),
         _ => Err(status.into()),
     }
 }
@@ -302,13 +292,13 @@ fn on_log_message(log_level: PINMAME_LOG_LEVEL, str: String) {
         return;
     }
     match log_level {
-        PINMAME_LOG_LEVEL_LOG_DEBUG => {
+        PINMAME_LOG_LEVEL_PINMAME_LOG_LEVEL_DEBUG => {
             debug!(target: "pinmame", "{}", str);
         }
-        PINMAME_LOG_LEVEL_LOG_INFO => {
+        PINMAME_LOG_LEVEL_PINMAME_LOG_LEVEL_INFO => {
             info!(target: "pinmame", "{}", str);
         }
-        PINMAME_LOG_LEVEL_LOG_ERROR => {
+        PINMAME_LOG_LEVEL_PINMAME_LOG_LEVEL_ERROR => {
             error!(target: "pinmame", "{}", str);
         }
         _ => warn!("Unknown log level: {}", log_level),
