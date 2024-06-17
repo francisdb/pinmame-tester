@@ -1,14 +1,11 @@
 #!/usr/bin/env bash
 set -e
 if [[ $OSTYPE == 'darwin'* ]]; then
-  brew install sdl2
-  brew install sdl2_gfx
-  brew install sdl2_ttf
+  brew install sdl2 sdl2_gfx sdl2_ttf
+  brew link sdl2 sdl2_gfx sdl2_ttf
 elif [[ $OSTYPE == 'linux-gnu'* ]]; then
   sudo apt-get update
-  sudo apt-get install -y libsdl2-dev
-  sudo apt-get install -y libsdl2-gfx-dev
-  sudo apt-get install -y libsdl2-ttf-dev
+  sudo apt-get install -y libsdl2-dev libsdl2-gfx-dev libsdl2-ttf-dev
 fi
 rm -rf pinmame
 git clone --depth 1 https://github.com/vpinball/pinmame.git pinmame
