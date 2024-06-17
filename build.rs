@@ -10,12 +10,19 @@ fn main() {
         .join("Release");
     println!("cargo:rustc-link-search=native={}", pinmame_dir.display());
 
+    // Required by libpinmame
+    println!("cargo:rustc-link-lib=z");
     // TODO get rid of this part and have libpinmame compile as a static library on linux
     if cfg!(target_os = "linux") {
         println!("cargo:rustc-link-lib=dylib=pinmame");
         println!("cargo:rustc-link-arg=-Wl,-rpath,{}/", pinmame_dir.display());
     } else {
+        // TODO if there is a dylib in the libpinmame directory, it will pick that over the .a file
+        // so we remove the dylib file in external.sh
         println!("cargo:rustc-link-lib=static=pinmame");
+    }
+    if cfg!(target_os = "macos") {
+        println!("cargo:rustc-link-lib=c++");
     }
 
     // Tell cargo to invalidate the built crate whenever the wrapper changes
