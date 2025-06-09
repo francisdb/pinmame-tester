@@ -20,4 +20,4 @@ default-features = false
 features = ["gfx", "ttf"] # , "image", "mixer", "ttf"
 
 [build-dependencies]
-bindgen = "0.71.0"
+bindgen = "0.72.0"
