@@ -4,7 +4,7 @@ extern crate lazy_static;
 use log::{debug, error, info, trace, warn};
 use std::{
     collections::HashMap,
-    ffi::{c_char, c_void, CString},
+    ffi::{CString, c_char, c_void},
     sync::mpsc,
 };
 
@@ -17,9 +17,9 @@ use sdl2::{
 };
 
 use libpinmame::{
-    PinmameAudioInfo, PinmameConfig, PinmameDisplayLayout, PinmameMechInfo,
     PINMAME_AUDIO_FORMAT_PINMAME_AUDIO_FORMAT_INT16, PINMAME_KEYCODE_PINMAME_KEYCODE_ESCAPE,
-    PINMAME_KEYCODE_PINMAME_KEYCODE_MENU, PINMAME_KEYCODE_PINMAME_KEYCODE_Q,
+    PINMAME_KEYCODE_PINMAME_KEYCODE_MENU, PINMAME_KEYCODE_PINMAME_KEYCODE_Q, PinmameAudioInfo,
+    PinmameConfig, PinmameDisplayLayout, PinmameMechInfo,
 };
 use pinmame::{Game, PinmameStatus};
 
@@ -27,8 +27,8 @@ use crate::{
     db::SwitchIndex,
     keyboard::map_keycode,
     pinmame::{
-        pinmame_on_console_data_updated_callback, pinmame_on_log_message_callback,
-        pinmame_on_solenoid_updated_callback, DmdMode,
+        DmdMode, pinmame_on_console_data_updated_callback, pinmame_on_log_message_callback,
+        pinmame_on_solenoid_updated_callback,
     },
 };
 mod db;
