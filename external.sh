@@ -10,20 +10,28 @@ rm -rf pinmame
 git clone --depth 1 https://github.com/vpinball/pinmame.git pinmame
 rm -rf pinmame/.git
 cd pinmame
+cp cmake/libpinmame/CMakeLists.txt .
+if [[ "$(uname)" == "Darwin" ]]; then
+  NUM_PROCS=$(sysctl -n hw.ncpu)
+else
+  NUM_PROCS=$(nproc)
+fi
+PLATFORM=unknown
+ARCH=unknown
 if [[ $OSTYPE == 'darwin'* ]]; then
+  PLATFORM=macos
   if [[ $(uname -m) == 'arm64' ]]; then
-    cp cmake/libpinmame/CMakeLists_osx-arm64.txt CMakeLists.txt
+    ARCH=arm64
   else
-    cp cmake/libpinmame/CMakeLists_osx-x64.txt CMakeLists.txt
+    ARCH=x64
   fi
 elif [[ $OSTYPE == 'linux-gnu'* ]]; then
-  cp cmake/libpinmame/CMakeLists_linux-x64.txt CMakeLists.txt
+  PLATFORM=linux
+  ARCH=x64
 fi
-cmake -DCMAKE_BUILD_TYPE=Release -B build/Release
-cmake --build build/Release -- -j$(sysctl -n hw.ncpu)
-# if [[ "${{ matrix.platform }}" == "linux-x64" ]]; then
-#   upx --best --lzma build/Release/${{ matrix.libpinmame }}
-# fi
+echo "Building pinmame for platform: ${PLATFORM}, arch: ${ARCH} with ${NUM_PROCS} threads"
+cmake -DCMAKE_BUILD_TYPE=Release -DPLATFORM=${PLATFORM} -DARCH=${ARCH} -B build/Release
+cmake --build build/Release -- -j${NUM_PROCS}
 
 # remove the dylib files (to make sure the rust linker does not use them)
 rm -rf build/Release/*.dylib
