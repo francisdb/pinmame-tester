@@ -1,10 +1,10 @@
-use std::ffi::{c_char, CString};
+use std::ffi::{CString, c_char};
 
 use log::warn;
 use sdl2::{pixels, rect::Rect};
 
 use crate::libpinmame::{
-    PinmameDisplayLayout, PinmameMechInfo, PINMAME_DISPLAY_TYPE_PINMAME_DISPLAY_TYPE_SEG16S,
+    PINMAME_DISPLAY_TYPE_PINMAME_DISPLAY_TYPE_SEG16S, PinmameDisplayLayout, PinmameMechInfo,
 };
 
 const PIXEL_SIZE: u32 = 3;
