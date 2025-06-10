@@ -15,3 +15,7 @@ Cargo.lock
 
 # we pull this from github on a build
 pinmame/
+
+# This is a generated file by bindgen and should not be committed
+# See genbind.sh
+/src/libpinmame.rs

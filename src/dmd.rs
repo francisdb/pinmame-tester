@@ -1,10 +1,8 @@
-use std::ffi::{c_char, CString};
-
 use log::warn;
 use sdl2::{pixels, rect::Rect};
 
 use crate::libpinmame::{
-    PinmameDisplayLayout, PinmameMechInfo, PINMAME_DISPLAY_TYPE_PINMAME_DISPLAY_TYPE_SEG16S,
+    PINMAME_DISPLAY_TYPE_PINMAME_DISPLAY_TYPE_SEG16S, PinmameDisplayLayout, PinmameMechInfo,
 };
 
 const PIXEL_SIZE: u32 = 3;
@@ -123,12 +121,12 @@ pub fn render_dmd(
 // }
 
 pub(crate) fn dump_alphanumeric(
-    index: i32,
+    _index: i32,
     display_data: *mut u16,
     display_layout: *mut PinmameDisplayLayout,
 ) {
     unsafe {
-        let mut output: [[c_char; 512]; 8] = [[0; 512]; 8];
+        // let mut output: [[c_char; 512]; 8] = [[0; 512]; 8];
 
         for pos in 0..(*display_layout).length {
             let value = *display_data.offset(pos as isize);
@@ -188,8 +186,8 @@ pub(crate) fn dump_alphanumeric(
                     }
                 }
 
-                let mut s = CString::new(segments[row]).unwrap();
-                let s2 = CString::new(" ").unwrap();
+                // let mut s = CString::new(segments[row]).unwrap();
+                // let s2 = CString::new(" ").unwrap();
                 // let s3 = CString::new(output[row].as_mut_ptr()).unwrap();
                 // s = s + s2;
                 // s = s + s3;

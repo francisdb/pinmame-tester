@@ -4,7 +4,7 @@ extern crate lazy_static;
 use log::{debug, error, info, trace, warn};
 use std::{
     collections::HashMap,
-    ffi::{c_char, c_void, CString},
+    ffi::{CString, c_char, c_void},
     sync::mpsc,
 };
 
@@ -17,9 +17,9 @@ use sdl2::{
 };
 
 use libpinmame::{
-    PinmameAudioInfo, PinmameConfig, PinmameDisplayLayout, PinmameMechInfo,
     PINMAME_AUDIO_FORMAT_PINMAME_AUDIO_FORMAT_INT16, PINMAME_KEYCODE_PINMAME_KEYCODE_ESCAPE,
-    PINMAME_KEYCODE_PINMAME_KEYCODE_MENU, PINMAME_KEYCODE_PINMAME_KEYCODE_Q,
+    PINMAME_KEYCODE_PINMAME_KEYCODE_MENU, PINMAME_KEYCODE_PINMAME_KEYCODE_Q, PinmameAudioInfo,
+    PinmameConfig, PinmameDisplayLayout, PinmameMechInfo,
 };
 use pinmame::{Game, PinmameStatus};
 
@@ -27,8 +27,8 @@ use crate::{
     db::SwitchIndex,
     keyboard::map_keycode,
     pinmame::{
-        pinmame_on_console_data_updated_callback, pinmame_on_log_message_callback,
-        pinmame_on_solenoid_updated_callback, DmdMode,
+        DmdMode, pinmame_on_console_data_updated_callback, pinmame_on_log_message_callback,
+        pinmame_on_solenoid_updated_callback,
     },
 };
 mod db;
@@ -41,7 +41,7 @@ mod keyboard;
     non_upper_case_globals
 )]
 mod libpinmame;
-mod pinmame;
+pub mod pinmame;
 mod switches;
 
 extern "C" fn pinmame_on_state_updated_callback(state: i32, _p_user_data: *const c_void) {
@@ -88,17 +88,17 @@ extern "C" fn pinmame_on_display_available_callback(
     let layout = unsafe { *display_layout };
 
     info!(
-            "OnDisplayAvailable(): index={}, displayCount={}, type={}, top={}, left={}, width={}, height={}, depth={}, length={}",
-            index,
-            display_count,
-            layout.type_,
-            layout.top,
-            layout.left,
-            layout.width,
-            layout.height,
-            layout.depth,
-            layout.length
-        );
+        "OnDisplayAvailable(): index={}, displayCount={}, type={}, top={}, left={}, width={}, height={}, depth={}, length={}",
+        index,
+        display_count,
+        layout.type_,
+        layout.top,
+        layout.left,
+        layout.width,
+        layout.height,
+        layout.depth,
+        layout.length
+    );
     // set the display layout
     let tester: &mut Tester = unsafe { &mut *(_p_user_data as *mut Tester) };
     tester.display_layout = Some(layout);
@@ -107,33 +107,34 @@ extern "C" fn pinmame_on_display_available_callback(
 unsafe extern "C" fn pinmame_on_display_updated_callback(
     index: i32,
     _display_data: *mut ::std::os::raw::c_void,
-    display_layout: *mut libpinmame::PinmameDisplayLayout,
+    display_layout: *mut PinmameDisplayLayout,
     _user_data: *const ::std::os::raw::c_void,
 ) {
+    let display_layout_ref = unsafe { display_layout.as_ref().unwrap() };
     trace!(
         "OnDisplayUpdated(): index={}, type={}, top={}, left={}, width={}, height={}, depth={}, length={}",
         index,
-        (*display_layout).type_,
-        (*display_layout).top,
-        (*display_layout).left,
-        (*display_layout).width,
-        (*display_layout).height,
-        (*display_layout).depth,
-        (*display_layout).length
+        display_layout_ref.type_,
+        display_layout_ref.top,
+        display_layout_ref.left,
+        display_layout_ref.width,
+        display_layout_ref.height,
+        display_layout_ref.depth,
+        display_layout_ref.length
     );
 
     if !_display_data.is_null() {
-        if ((*display_layout).type_ & libpinmame::PINMAME_DISPLAY_TYPE_PINMAME_DISPLAY_TYPE_DMD)
+        if (display_layout_ref.type_ & libpinmame::PINMAME_DISPLAY_TYPE_PINMAME_DISPLAY_TYPE_DMD)
             == libpinmame::PINMAME_DISPLAY_TYPE_PINMAME_DISPLAY_TYPE_DMD
         {
             let tester: &mut Tester = unsafe { &mut *(_user_data as *mut Tester) };
-            match tester.display_data.send(
+            match tester.display_data.send(unsafe {
                 std::slice::from_raw_parts_mut(
                     _display_data as *mut u8,
-                    (*display_layout).width as usize * (*display_layout).height as usize,
+                    display_layout_ref.width as usize * display_layout_ref.height as usize,
                 )
-                .to_owned(),
-            ) {
+                .to_owned()
+            }) {
                 Ok(_) => {}
                 Err(e) => {
                     error!("display_data send failed: {}", e);
@@ -147,10 +148,10 @@ unsafe extern "C" fn pinmame_on_display_updated_callback(
 }
 
 unsafe extern "C" fn pinmame_on_audio_available_callback(
-    audio_info: *mut libpinmame::PinmameAudioInfo,
+    audio_info: *mut PinmameAudioInfo,
     _user_data: *const ::std::os::raw::c_void,
 ) -> i32 {
-    let audio_info = audio_info.as_ref().unwrap();
+    let audio_info = unsafe { audio_info.as_ref().unwrap() };
     let format = match audio_info.format {
         libpinmame::PINMAME_AUDIO_FORMAT_PINMAME_AUDIO_FORMAT_INT16 => "int16",
         libpinmame::PINMAME_AUDIO_FORMAT_PINMAME_AUDIO_FORMAT_FLOAT => "float",
@@ -180,7 +181,7 @@ unsafe extern "C" fn pinmame_on_mech_available_callback(
 ) {
     // TODO not sure we need to clone here
     // TODO do we need to free this memory?
-    let mech_info = mech_info.as_ref().unwrap();
+    let mech_info = unsafe { mech_info.as_ref().expect("mech_info is null") };
     let safe_mech_info = PinmameMechInfo {
         type_: mech_info.type_,
         length: mech_info.length,
@@ -208,17 +209,18 @@ pub unsafe extern "C" fn pinmame_on_mech_updated_callback(
     mech_info: *mut PinmameMechInfo,
     _user_data: *const ::std::os::raw::c_void,
 ) {
+    let mech_info_ref = unsafe { mech_info.as_ref().unwrap() };
     trace!(
         "OnMechUpdated: mechNo={}, type={}, length={}, steps={}, pos={}, speed={}",
         mech_no,
-        (*mech_info).type_,
-        (*mech_info).length,
-        (*mech_info).steps,
-        (*mech_info).pos,
-        (*mech_info).speed
+        mech_info_ref.type_,
+        mech_info_ref.length,
+        mech_info_ref.steps,
+        mech_info_ref.pos,
+        mech_info_ref.speed
     );
     let tester: &mut Tester = unsafe { &mut *(_user_data as *mut Tester) };
-    tester.mech_info[mech_no as usize] = *mech_info;
+    tester.mech_info[mech_no as usize] = unsafe { *mech_info };
 }
 
 extern "C" fn pinmame_on_audio_updated_callback(
@@ -397,9 +399,9 @@ fn main() -> Result<(), String> {
             info!("Found {} games", games.len());
             let mut games = games;
             games.sort_by(|a, b| a.name.cmp(&b.name));
-            for game in games {
-                //info!("  {}", describe_game(game));
-            }
+            // for game in games {
+            //     info!("  {}", describe_game(game));
+            // }
         }
         Err(status) => {
             error!("get_games() failed: {:?}", status);
