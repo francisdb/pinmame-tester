@@ -8,7 +8,7 @@ use crate::libpinmame::{
     PinmameIsRunning, PinmameLampState, PinmamePause, PinmameReset, PinmameRun, PinmameSetConfig,
     PinmameSetDmdMode, PinmameSetHandleKeyboard, PinmameSetHandleMechanics, PinmameSetSwitch,
     PinmameSetSwitches, PinmameSetUserData, PinmameSolenoidState, PinmameStop, PinmameSwitchState,
-    __va_list_tag, PINMAME_DMD_MODE, PINMAME_DMD_MODE_PINMAME_DMD_MODE_BRIGHTNESS,
+    PINMAME_DMD_MODE, PINMAME_DMD_MODE_PINMAME_DMD_MODE_BRIGHTNESS,
     PINMAME_DMD_MODE_PINMAME_DMD_MODE_RAW, PINMAME_LOG_LEVEL,
     PINMAME_LOG_LEVEL_PINMAME_LOG_LEVEL_DEBUG, PINMAME_LOG_LEVEL_PINMAME_LOG_LEVEL_ERROR,
     PINMAME_LOG_LEVEL_PINMAME_LOG_LEVEL_INFO, PINMAME_STATUS,
@@ -286,11 +286,17 @@ pub unsafe extern "C" fn pinmame_on_console_data_updated_callback(
     info!("OnConsoleDataUpdated: size={}", size);
 }
 
+// see https://github.com/rust-lang/rust-bindgen/issues/2631
+#[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
+type VaListType = *mut crate::libpinmame::__va_list_tag;
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+type VaListType = crate::libpinmame::va_list;
+
 //TODO make private
 pub unsafe extern "C" fn pinmame_on_log_message_callback(
     log_level: u32,
     format: *const ::std::os::raw::c_char,
-    args: *mut __va_list_tag,
+    args: VaListType,
     _user_data: *const ::std::os::raw::c_void,
 ) {
     let str = unsafe { vsprintf::vsprintf(format, args).unwrap() };
