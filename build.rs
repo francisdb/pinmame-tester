@@ -37,6 +37,11 @@ fn main() {
         .header("wrapper.h")
         .clang_arg("-x")
         .clang_arg("c++")
+        // The header is parsed as C++ and pulls in the C++ stdlib headers; without
+        // this, bindgen also emits libc++ template internals (e.g. a `_Tp` static)
+        // that don't compile. Restrict generation to libpinmame's own symbols; the
+        // types they depend on (va_list, etc.) are still pulled in transitively.
+        .allowlist_file(".*libpinmame.h")
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
