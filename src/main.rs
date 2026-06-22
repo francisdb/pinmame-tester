@@ -47,7 +47,7 @@ mod libpinmame {
 pub mod pinmame;
 mod switches;
 
-extern "C" fn pinmame_on_state_updated_callback(state: i32, _p_user_data: *const c_void) {
+extern "C" fn pinmame_on_state_updated_callback(state: i32, _p_user_data: *mut c_void) {
     info!("OnStateUpdated(): state={}", state);
 
     if state == 0 {
@@ -86,7 +86,7 @@ extern "C" fn pinmame_on_display_available_callback(
     index: i32,
     display_count: i32,
     display_layout: *mut libpinmame::PinmameDisplayLayout,
-    _p_user_data: *const c_void,
+    _p_user_data: *mut c_void,
 ) {
     let layout = unsafe { *display_layout };
 
@@ -111,7 +111,7 @@ unsafe extern "C" fn pinmame_on_display_updated_callback(
     index: i32,
     _display_data: *mut ::std::os::raw::c_void,
     display_layout: *mut PinmameDisplayLayout,
-    _user_data: *const ::std::os::raw::c_void,
+    _user_data: *mut ::std::os::raw::c_void,
 ) {
     let display_layout_ref = unsafe { display_layout.as_ref().unwrap() };
     trace!(
@@ -152,7 +152,7 @@ unsafe extern "C" fn pinmame_on_display_updated_callback(
 
 unsafe extern "C" fn pinmame_on_audio_available_callback(
     audio_info: *mut PinmameAudioInfo,
-    _user_data: *const ::std::os::raw::c_void,
+    _user_data: *mut ::std::os::raw::c_void,
 ) -> i32 {
     let audio_info = unsafe { audio_info.as_ref().unwrap() };
     let format = match audio_info.format {
@@ -180,7 +180,7 @@ unsafe extern "C" fn pinmame_on_audio_available_callback(
 unsafe extern "C" fn pinmame_on_mech_available_callback(
     mech_no: ::std::os::raw::c_int,
     mech_info: *mut libpinmame::PinmameMechInfo,
-    _user_data: *const ::std::os::raw::c_void,
+    _user_data: *mut ::std::os::raw::c_void,
 ) {
     // TODO not sure we need to clone here
     // TODO do we need to free this memory?
@@ -210,7 +210,7 @@ unsafe extern "C" fn pinmame_on_mech_available_callback(
 pub unsafe extern "C" fn pinmame_on_mech_updated_callback(
     mech_no: i32,
     mech_info: *mut PinmameMechInfo,
-    _user_data: *const ::std::os::raw::c_void,
+    _user_data: *mut ::std::os::raw::c_void,
 ) {
     let mech_info_ref = unsafe { mech_info.as_ref().unwrap() };
     trace!(
@@ -229,7 +229,7 @@ pub unsafe extern "C" fn pinmame_on_mech_updated_callback(
 extern "C" fn pinmame_on_audio_updated_callback(
     _buffer: *mut ::std::os::raw::c_void,
     samples: i32,
-    _user_data: *const c_void,
+    _user_data: *mut c_void,
 ) -> i32 {
     // trace!("OnAudioUpdated(): samples={}", samples);
 
@@ -251,7 +251,7 @@ extern "C" fn pinmame_on_audio_updated_callback(
 extern "C" fn pinmame_on_sound_command_callback(
     board_no: ::std::os::raw::c_int,
     cmd: ::std::os::raw::c_int,
-    _p_user_data: *const ::std::os::raw::c_void,
+    _p_user_data: *mut ::std::os::raw::c_void,
 ) {
     // TODO
     info!("OnSoundCommand(): boardNo={}, cmd={}", board_no, cmd);
@@ -259,7 +259,7 @@ extern "C" fn pinmame_on_sound_command_callback(
 
 extern "C" fn pinmame_is_key_pressed_callback(
     _keycode: libpinmame::PINMAME_KEYCODE,
-    _user_data: *const ::std::os::raw::c_void,
+    _user_data: *mut ::std::os::raw::c_void,
 ) -> i32 {
     //info!("IsKeyPressed: keycode={}", _keycode);
     let tester = unsafe { &*(_user_data as *const Tester) };
@@ -392,7 +392,7 @@ fn main() -> Result<(), String> {
 
     pinmame::set_config(&config);
 
-    pinmame::set_user_data(&tester as *const Tester as *const std::ffi::c_void);
+    pinmame::set_user_data(&tester as *const Tester as *mut std::ffi::c_void);
     pinmame::set_handle_keyboard(false);
     pinmame::set_handle_mechanics(true);
 

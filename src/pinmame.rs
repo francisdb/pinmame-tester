@@ -99,7 +99,7 @@ pub fn set_config(config: &PinmameConfig) {
     unsafe { PinmameSetConfig(config) }
 }
 
-pub fn set_user_data(user_data: *const std::ffi::c_void) {
+pub fn set_user_data(user_data: *mut std::ffi::c_void) {
     unsafe { PinmameSetUserData(user_data) }
 }
 
@@ -243,7 +243,7 @@ struct GameUserData {
     game: Option<Game>,
 }
 
-extern "C" fn game_callback(game: *mut PinmameGame, mut _p_user_data: *const c_void) {
+extern "C" fn game_callback(game: *mut PinmameGame, mut _p_user_data: *mut c_void) {
     unsafe {
         let game = &mut *game;
         let p_user_data = &mut *(_p_user_data as *mut GameUserData);
@@ -255,7 +255,7 @@ struct GamesUserData {
     games: Vec<Game>,
 }
 
-extern "C" fn games_callback(game: *mut PinmameGame, mut _p_user_data: *const c_void) {
+extern "C" fn games_callback(game: *mut PinmameGame, mut _p_user_data: *mut c_void) {
     unsafe {
         let game = &mut *game;
         let p_user_data = &mut *(_p_user_data as *mut GamesUserData);
@@ -266,7 +266,7 @@ extern "C" fn games_callback(game: *mut PinmameGame, mut _p_user_data: *const c_
 //TODO make private
 pub extern "C" fn pinmame_on_solenoid_updated_callback(
     solenoid_state: *mut PinmameSolenoidState,
-    _user_data: *const ::std::os::raw::c_void,
+    _user_data: *mut ::std::os::raw::c_void,
 ) {
     unsafe {
         trace!(
@@ -281,7 +281,7 @@ pub extern "C" fn pinmame_on_solenoid_updated_callback(
 pub unsafe extern "C" fn pinmame_on_console_data_updated_callback(
     _data: *mut ::std::os::raw::c_void,
     size: i32,
-    _user_data: *const ::std::os::raw::c_void,
+    _user_data: *mut ::std::os::raw::c_void,
 ) {
     info!("OnConsoleDataUpdated: size={}", size);
 }
@@ -297,7 +297,7 @@ pub unsafe extern "C" fn pinmame_on_log_message_callback(
     log_level: u32,
     format: *const ::std::os::raw::c_char,
     args: VaListType,
-    _user_data: *const ::std::os::raw::c_void,
+    _user_data: *mut ::std::os::raw::c_void,
 ) {
     let str = unsafe { vsprintf::vsprintf(format, args).unwrap() };
     on_log_message(log_level, str);

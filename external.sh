@@ -7,11 +7,10 @@ elif [[ $OSTYPE == 'linux-gnu'* ]]; then
   sudo apt-get install -y libsdl2-dev libsdl2-gfx-dev libsdl2-ttf-dev
 fi
 rm -rf pinmame
-# Pinned: later libpinmame.h revisions include the C++ stdlib headers (<cstdint>
-# etc.) in C++ mode, which leak libc++ templates into the bindgen output, and
-# changed the callback userData from `const void*` to `void* const`. This tag
-# matches the API the Rust source is written against.
-PINMAME_TAG=v3.7.0-46-2b48173
+# Pinned for reproducible builds. The bindgen allowlist in build.rs keeps the
+# C++ stdlib headers that newer revisions include (<cstdint> etc.) from leaking
+# libc++ templates into the generated bindings.
+PINMAME_TAG=v3.7.0-222-8133307
 git clone --depth 1 --branch "$PINMAME_TAG" https://github.com/vpinball/pinmame.git pinmame
 rm -rf pinmame/.git
 cd pinmame
