@@ -29,8 +29,6 @@ jobs:
           rustflags: ''
       - name: Get dependencies
         run: ./external.sh
-      - name: (Re)Generate bindings
-        run: ./genbind.sh
       - name: Check formatting
         run: cargo fmt --all --check -- --color=always
       - name: Set LIBRARY_PATH for macOS
