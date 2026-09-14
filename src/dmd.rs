@@ -10,10 +10,6 @@ const PIXEL_SIZE: u32 = 3;
 // const PIXELS_WIDTH: u32 = 128;
 // const PIXELS_HEIGHT: u32 = 32;
 
-pub fn dmd_width(display_layout: &PinmameDisplayLayout) -> u32 {
-    display_layout.width as u32 * (PIXEL_SIZE + 1)
-}
-
 pub fn dmd_height(display_layout: &PinmameDisplayLayout) -> u32 {
     display_layout.height as u32 * (PIXEL_SIZE + 1)
 }
@@ -129,7 +125,8 @@ pub(crate) fn dump_alphanumeric(
         // let mut output: [[c_char; 512]; 8] = [[0; 512]; 8];
 
         for pos in 0..(*display_layout).length {
-            let value = *display_data.offset(pos as isize);
+            // Read but not yet used: the segment rendering below is still a TODO.
+            let _value = *display_data.offset(pos as isize);
 
             let segments_16c = [
                 " AAAAA   ",
