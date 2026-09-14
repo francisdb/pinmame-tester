@@ -33,9 +33,15 @@ elif [[ $OSTYPE == 'linux-gnu'* ]]; then
   PLATFORM=linux
   ARCH=x64
 fi
-echo "Building pinmame for platform: ${PLATFORM}, arch: ${ARCH} with ${NUM_PROCS} threads"
-cmake -DCMAKE_BUILD_TYPE=Release -DPLATFORM=${PLATFORM} -DARCH=${ARCH} -B build/Release
-cmake --build build/Release -- -j${NUM_PROCS}
-
-# remove the dylib files (to make sure the rust linker does not use them)
-rm -rf build/Release/*.dylib
+# Only the library flavor build.rs links: the static one on macOS, the shared one on Linux.
+# This skips the second compile of every source for the other flavor and the test executables.
+if [[ $OSTYPE == 'darwin'* ]]; then
+  LIB_FLAVOR_ARGS=(-DBUILD_SHARED=OFF -DBUILD_STATIC=ON)
+  LIB_TARGET=pinmame_static
+else
+  LIB_FLAVOR_ARGS=(-DBUILD_SHARED=ON -DBUILD_STATIC=OFF)
+  LIB_TARGET=pinmame_shared
+fi
+echo "Building ${LIB_TARGET} for platform: ${PLATFORM}, arch: ${ARCH} with ${NUM_PROCS} threads"
+cmake -DCMAKE_BUILD_TYPE=Release -DPLATFORM=${PLATFORM} -DARCH=${ARCH} "${LIB_FLAVOR_ARGS[@]}" -B build/Release
+cmake --build build/Release --target ${LIB_TARGET} -- -j${NUM_PROCS}
