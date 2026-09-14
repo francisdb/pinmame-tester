@@ -17,8 +17,8 @@ fn main() {
         println!("cargo:rustc-link-lib=dylib=pinmame");
         println!("cargo:rustc-link-arg=-Wl,-rpath,{}/", pinmame_dir.display());
     } else {
-        // TODO if there is a dylib in the libpinmame directory, it will pick that over the .a file
-        // so we remove the dylib file in external.sh
+        // A dylib next to the .a would be picked over it, so external.sh builds only the
+        // static library on macOS.
         println!("cargo:rustc-link-lib=static=pinmame");
     }
     if cfg!(target_os = "macos") {
