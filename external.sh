@@ -10,8 +10,11 @@ rm -rf pinmame
 # Pinned for reproducible builds. The bindgen allowlist in build.rs keeps the
 # C++ stdlib headers that newer revisions include (<cstdint> etc.) from leaking
 # libc++ templates into the generated bindings.
-PINMAME_TAG=v3.7.0-222-8133307
-git clone --depth 1 --branch "$PINMAME_TAG" https://github.com/vpinball/pinmame.git pinmame
+# Any tag or commit works; a commit is used while no tag contains the -fno-common fix (pinmame #677).
+PINMAME_REF=a0998e03
+git init -q pinmame
+git -C pinmame fetch -q --depth 1 https://github.com/vpinball/pinmame.git "$PINMAME_REF"
+git -C pinmame checkout -q FETCH_HEAD
 rm -rf pinmame/.git
 cd pinmame
 cp cmake/libpinmame/CMakeLists.txt .
